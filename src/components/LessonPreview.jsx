@@ -83,7 +83,7 @@ const LessonPreview = ({ lesson, onClose }) => {
               )}
               {lesson.quiz.map((q, index) => (
                 <div key={index} className="quiz-question">
-                  <p><strong className="quiz-question-text">{index + 1}. {q.question}</strong></p>
+                  <p><strong className="quiz-question-text" style={{ color: '#000' }}>{index + 1}. {q.question}</strong></p>
                   <div className="options-container">
                     {q.options.map(opt => {
                       let className = 'option-btn';
@@ -116,6 +116,8 @@ const LessonPreview = ({ lesson, onClose }) => {
           {(currentSceneIndex > 0 || showQuiz) && (
             <button onClick={handlePrev}>&larr; Previous</button>
           )}
+          {/* <button onClick={onClose}>&larr; Exit</button> */}
+          <button className="close-btn" onClick={onClose}>&times;</button>
                   {!showQuiz && (
             currentSceneIndex < totalScenes - 1 ? (
               <button onClick={handleNext}>Next &rarr;</button>

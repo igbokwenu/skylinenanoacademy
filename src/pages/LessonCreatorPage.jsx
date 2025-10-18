@@ -234,7 +234,17 @@ const LessonCreatorPage = () => {
                 onChange={(e) => setSceneCount(e.target.value)}
               />
             </div>
+       
           </div>
+                 {generatedLesson && !isLoading && (
+            <div className="preview-ready" style={{ textAlign: 'center' }}>
+              <h4>Your lesson is ready!</h4>
+              <p>"{generatedLesson.title}"</p>
+              <button className="preview-btn" onClick={() => setIsPreviewVisible(true)}>
+                Preview Lesson
+              </button>
+            </div>
+          )}
         </div>
         <div className="lc-actions-panel">
           <h3>3. Generate & Preview</h3>
