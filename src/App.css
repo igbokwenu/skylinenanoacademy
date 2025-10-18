@@ -475,3 +475,20 @@ button:hover {
   display: block;
   margin-bottom: 5px;
 }
+
+.quiz-question-text {
+  color: #333; /* Or any dark color you prefer */
+}
+
+.scene-count-slider {
+  grid-column: 1 / -1; /* Make the slider span both columns */
+  margin-top: 10px;
+}
+.scene-count-slider label {
+  display: block;
+  margin-bottom: 8px;
+}
+.scene-count-slider input[type="range"] {
+  width: 100%;
+  cursor: pointer;
+}

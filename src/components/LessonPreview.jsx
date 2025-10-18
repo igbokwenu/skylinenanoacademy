@@ -83,7 +83,7 @@ const LessonPreview = ({ lesson, onClose }) => {
               )}
               {lesson.quiz.map((q, index) => (
                 <div key={index} className="quiz-question">
-                  <p><strong>{index + 1}. {q.question}</strong></p>
+                  <p><strong className="quiz-question-text">{index + 1}. {q.question}</strong></p>
                   <div className="options-container">
                     {q.options.map(opt => {
                       let className = 'option-btn';
@@ -113,12 +113,16 @@ const LessonPreview = ({ lesson, onClose }) => {
         </main>
 
         <footer>
-          <button onClick={handlePrev} disabled={currentSceneIndex === 0 && !showQuiz}>
-            &larr; Previous
-          </button>
-          <button onClick={handleNext} disabled={showQuiz}>
-            {currentSceneIndex === totalScenes - 1 ? 'Go to Quiz' : 'Next'} &rarr;
-          </button>
+          {(currentSceneIndex > 0 || showQuiz) && (
+            <button onClick={handlePrev}>&larr; Previous</button>
+          )}
+                  {!showQuiz && (
+            currentSceneIndex < totalScenes - 1 ? (
+              <button onClick={handleNext}>Next &rarr;</button>
+            ) : (
+              <button onClick={handleNext}>Go to Quiz &rarr;</button>
+            )
+          )}
         </footer>
       </div>
     </div>

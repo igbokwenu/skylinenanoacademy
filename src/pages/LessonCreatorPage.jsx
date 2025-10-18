@@ -86,28 +86,57 @@ const LessonCreatorPage = () => {
     perspective: lessonParams.perspectives[0],
     studentName: ''
   });
+  // NEW: State for adjustable scene count
+  const [sceneCount, setSceneCount] = useState(5); 
   const [generatedLesson, setGeneratedLesson] = useState(null);
   const [isPreviewVisible, setIsPreviewVisible] = useState(false);
   const [generationError, setGenerationError] = useState(null);
 
   const { getMonitor } = useMonitorDownload();
-
-  // We no longer need special model options, we will apply the constraint at execution time.
   const { 
     isLoading, status, output: streamingOutput,
     executePrompt, abortCurrentPrompt, tokenInfo
   } = useLanguageModel({ apiName: 'LanguageModel' });
 
-  // FINAL FIX 2: A hyper-literal prompt designed to work with responseConstraint.
+  // FEATURE UPDATE: The schema is now dynamic based on sceneCount.
+  const lessonSchema = useMemo(() => ({
+    type: "object",
+    properties: {
+      title: { type: "string" },
+      lesson: {
+        type: "array",
+        minItems: Number(sceneCount),
+        maxItems: Number(sceneCount),
+        items: {
+          type: "object",
+          properties: { scene: { type: "number" }, image_prompt: { type: "string" }, paragraph: { type: "string" } },
+          required: ["scene", "image_prompt", "paragraph"]
+        }
+      },
+      quiz: {
+        type: "array",
+        minItems: Number(sceneCount),
+        maxItems: Number(sceneCount),
+        items: {
+          type: "object",
+          properties: { question: { type: "string" }, options: { type: "array", items: { type: "string" }, minItems: 4, maxItems: 4 }, answer: { type: "string" } },
+          required: ["question", "options", "answer"]
+        }
+      }
+    },
+    required: ["title", "lesson", "quiz"]
+  }), [sceneCount]); // Re-generate the schema whenever sceneCount changes.
+
+
+  // FEATURE UPDATE: The prompt now includes the dynamic sceneCount.
   const userRequestPrompt = useMemo(() => {
     let studentInfo = settings.perspective.includes('Immersive') && settings.studentName
       ? `The main character is a student named "${settings.studentName}".`
       : '';
   
-    // This prompt now focuses SOLELY on the content, as the schema will handle the structure.
     return `
       Create the content for a JSON object representing a lesson.
-      The lesson MUST have a title, EXACTLY 5 lesson scenes, and a quiz with EXACTLY 5 questions.
+      The lesson MUST have a title, EXACTLY ${sceneCount} lesson scenes, and a quiz with EXACTLY ${sceneCount} questions.
       
       Generate the content based on these specifications:
       - Topic: ${settings.prompt}
@@ -117,20 +146,19 @@ const LessonCreatorPage = () => {
       - Target Age Group: ${settings.ageGroup}
       - Narrative Perspective: ${settings.perspective}. ${studentInfo}
 
-      For each of the 5 scenes, create a detailed image_prompt and a paragraph for the story.
-      For each of the 5 quiz questions, create a 'question', 4 'options', and an 'answer'.
+      For each of the ${sceneCount} scenes, create a detailed 'image_prompt' and a 'paragraph'.
+      For each of the ${sceneCount} quiz questions, create a 'question', 4 'options', and an 'answer'.
     `;
-  }, [settings]);
+  }, [settings, sceneCount]); // Re-generate the prompt if settings or sceneCount change.
 
   const handleCreateLesson = async () => {
     setIsPreviewVisible(false);
     setGeneratedLesson(null);
     setGenerationError(null);
     
-    // FINAL FIX 3: We now pass the schema as a `responseConstraint`
     const rawAiResult = await executePrompt(
         userRequestPrompt, 
-        { responseConstraint: lessonSchema }, // This FORCES the output to be valid JSON.
+        { responseConstraint: lessonSchema },
         getMonitor()
     );
 
@@ -138,17 +166,11 @@ const LessonCreatorPage = () => {
       console.log("--- Raw AI Tool Output Log ---");
       console.log(rawAiResult);
       console.log("----------------------------");
-
-      // With responseConstraint, the output IS GUARANTEED to be valid JSON.
-      // The cleaner is now just a fallback for weird edge cases.
       const parsedLesson = cleanAndParseJson(rawAiResult);
-
       if (parsedLesson) {
         setGeneratedLesson(parsedLesson);
       } else {
-        // This error should be very rare now. It means the model failed to generate *anything*.
         setGenerationError("The AI failed to generate a response. This could be due to a network issue or an internal model error. Please try again.");
-        console.error("The model returned a result, but it was not parsable, even with responseConstraint active.");
       }
     } else if (!isLoading) {
         setGenerationError("Lesson generation failed. The model may be offline or the request was aborted.");
@@ -199,6 +221,19 @@ const LessonCreatorPage = () => {
                 <input type="text" id="studentName" name="studentName" value={settings.studentName} onChange={handleSettingChange} placeholder="Enter name for immersive story" />
               </div>
             )}
+                        {/* NEW: Slider for Scene/Quiz Count */}
+            <div className="setting-item scene-count-slider">
+              <label htmlFor="sceneCount">Scenes & Quizzes: <strong>{sceneCount}</strong></label>
+              <input
+                type="range"
+                id="sceneCount"
+                name="sceneCount"
+                min="5"
+                max="12"
+                value={sceneCount}
+                onChange={(e) => setSceneCount(e.target.value)}
+              />
+            </div>
           </div>
         </div>
         <div className="lc-actions-panel">
