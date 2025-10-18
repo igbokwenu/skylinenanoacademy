@@ -477,7 +477,7 @@ button:hover {
 }
 
 .quiz-question-text {
-  color: #333; /* Or any dark color you prefer */
+  color: #000000; /* Ensure quiz question text is black */
 }
 
 .scene-count-slider {
