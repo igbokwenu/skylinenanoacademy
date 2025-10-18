@@ -34,7 +34,11 @@ const LessonPreview = ({ lesson, onClose }) => {
   };
 
   const handleSubmitQuiz = () => {
-    setSubmitted(true);
+    if (Object.keys(userAnswers).length !== totalQuestions) {
+      alert('Please answer all questions first.');
+    } else {
+      setSubmitted(true);
+    }
   };
   
   // Handle Escape key to close the preview

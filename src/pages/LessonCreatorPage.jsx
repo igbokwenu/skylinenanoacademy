@@ -91,6 +91,7 @@ const LessonCreatorPage = () => {
   const [generatedLesson, setGeneratedLesson] = useState(null);
   const [isPreviewVisible, setIsPreviewVisible] = useState(false);
   const [generationError, setGenerationError] = useState(null);
+  const [isStreamVisible, setIsStreamVisible] = useState(false);
 
   const { getMonitor } = useMonitorDownload();
   const { 
@@ -265,7 +266,14 @@ const LessonCreatorPage = () => {
               <p>{generationError}</p>
             </div>
           )}
-          {streamingOutput && <pre className='output'>{streamingOutput}</pre>}
+                    {streamingOutput && (
+            <div className="collapsible-stream">
+              <button onClick={() => setIsStreamVisible(!isStreamVisible)} className="stream-toggle-btn">
+                {isStreamVisible ? 'Hide Stream' : 'Click to view stream'}
+              </button>
+              {isStreamVisible && <pre className='output'>{streamingOutput}</pre>}
+            </div>
+          )}
           {generatedLesson && !isLoading && (
             <div className="preview-ready">
               <h4>Your lesson is ready!</h4>
