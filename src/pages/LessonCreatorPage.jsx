@@ -4,7 +4,7 @@ import React, { useState, useMemo } from 'react';
 import { useLanguageModel } from '../hooks/useLanguageModel';
 import { useMonitorDownload } from '../hooks/useMonitorDownload';
 import LessonPreview from '../components/LessonPreview';
-import lessonCreatorIcon from '../assets/lesson_creator_icon.svg';
+import lessonCreatorIcon from '../assets/app_logo.svg';
 
 // --- Configuration (Unchanged) ---
 const lessonParams = {
