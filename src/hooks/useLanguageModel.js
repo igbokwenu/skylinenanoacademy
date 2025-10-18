@@ -1,6 +1,6 @@
 // src/hooks/useLanguageModel.js
 
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useRef, useEffect, useCallback, useMemo } from 'react'; // <-- THIS LINE IS FIXED
 import { formatTokenUsage } from '../utils/tokenUtils';
 
 /**
@@ -37,6 +37,12 @@ export const useLanguageModel = ({ apiName, creationOptions = {} }) => {
       }
     }
   }, []);
+  
+  // Add expectedOutputs to resolve console warning
+  const finalCreationOptions = useMemo(() => ({
+    ...creationOptions,
+    expectedOutputs: [{ type: "text", languages: ["en"] }]
+  }), [creationOptions]);
 
   const initializeSession = useCallback(async (monitor) => {
     if (!isSupported) return false;
@@ -45,7 +51,7 @@ export const useLanguageModel = ({ apiName, creationOptions = {} }) => {
     setIsLoading(true);
     setStatus('Initializing session...');
     try {
-      const session = await self[apiName].create({ ...creationOptions, ...monitor });
+      const session = await self[apiName].create({ ...finalCreationOptions, ...monitor });
       if ('addEventListener' in session) {
           session.addEventListener("quotaoverflow", () => {
             setStatus("Warning: Context overflowed. Oldest messages dropped.");
@@ -63,27 +69,28 @@ export const useLanguageModel = ({ apiName, creationOptions = {} }) => {
     } finally {
       setIsLoading(false);
     }
-  }, [isSupported, apiName, creationOptions, updateTokenUsage]);
+  }, [isSupported, apiName, finalCreationOptions, updateTokenUsage]);
 
   const executePrompt = useCallback(async (prompt, options = {}, monitor) => {
-    if (!await initializeSession(monitor)) return;
+    if (!await initializeSession(monitor)) return null; // Return null on failure
 
     abortControllerRef.current = new AbortController();
     const { signal } = abortControllerRef.current;
 
     setIsLoading(true);
     setStatus('Generating response...');
-    setOutput('');
+    setOutput(''); // Clear previous streaming output
 
     try {
       const session = sessionRef.current;
-      // Use the appropriate method based on the API
       const executionMethod = session.promptStreaming || session.writeStreaming || session.rewriteStreaming || session.summarizeStreaming;
       
+      let finalResult = '';
+
       if (!executionMethod) {
-          // Fallback for APIs that don't support streaming
           const result = await (session.prompt || session.write || session.rewrite || session.summarize)(prompt, { ...options, signal });
           setOutput(result);
+          finalResult = result;
       } else {
           const stream = await executionMethod.call(session, prompt, { ...options, signal });
           let fullResponse = '';
@@ -91,10 +98,12 @@ export const useLanguageModel = ({ apiName, creationOptions = {} }) => {
             fullResponse += chunk;
             setOutput(fullResponse);
           }
+          finalResult = fullResponse;
       }
       
       setStatus('Response complete.');
       await updateTokenUsage();
+      return finalResult;
 
     } catch (error) {
       if (error.name === 'AbortError') {
@@ -104,6 +113,7 @@ export const useLanguageModel = ({ apiName, creationOptions = {} }) => {
         setStatus(`Error: ${error.message}`);
         setOutput(`Error during execution: ${error.message}`);
       }
+      return null;
     } finally {
       setIsLoading(false);
       abortControllerRef.current = null;

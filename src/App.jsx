@@ -1,43 +1,55 @@
 // src/App.jsx
 
 import React, { useState, useEffect } from 'react';
+import { Routes, Route, NavLink, useLocation } from 'react-router-dom';
 import './App.css';
 
-// CORRECTION: Ensured all imports use the exact PascalCase 'Api' spelling 
-// to match the filenames.
-import PromptApi from './components/PromptApi';
-import WriterApi from './components/WriterApi';
-import RewriterApi from './components/RewriterApi';
-import ProofreaderApi from './components/ProofreaderApi';
-import SummarizerApi from './components/SummarizerApi';
+import HomePage from './pages/HomePage';
+import LessonCreatorPage from './pages/LessonCreatorPage';
 import { useMonitorDownload } from './hooks/useMonitorDownload';
 
 function App() {
   const [apiSupportStatus, setApiSupportStatus] = useState('Checking for on-device AI support...');
   const { downloadStatus } = useMonitorDownload();
+  const location = useLocation();
 
   useEffect(() => {
     if ('LanguageModel' in self || 'Writer' in self) {
-      setApiSupportStatus('On-device AI support detected. Components are ready.');
+      setApiSupportStatus('On-device AI support detected.');
     } else {
       setApiSupportStatus('On-device AI not supported. Use Chrome 127+ and enable #prompt-api flag.');
     }
   }, []);
 
+  const getPageTitle = () => {
+    switch (location.pathname) {
+      case '/lesson-creator':
+        return 'Robust On-Device AI - Lesson Creator';
+      case '/':
+      default:
+        return 'Robust On-Device AI - Home';
+    }
+  };
+
   return (
     <div className="container">
       <header>
-        <h1>Skyline Nano Academy - Robust On-Device AI</h1>
+        <h1>Skyline Nano Academy</h1>
+        <nav className="main-nav">
+          <NavLink to="/" className={({ isActive }) => isActive ? 'nav-active' : ''}>API Playground</NavLink>
+          <NavLink to="/lesson-creator" className={({ isActive }) => isActive ? 'nav-active' : ''}>Lesson Creator</NavLink>
+        </nav>
         <div className="status-bar">
           <strong>Global Status:</strong> {downloadStatus || apiSupportStatus}
         </div>
       </header>
-
-      <PromptApi />
-      <WriterApi />
-      <RewriterApi />
-      <ProofreaderApi />
-      <SummarizerApi />
+      
+      <main>
+        <Routes>
+          <Route path="/" element={<HomePage />} />
+          <Route path="/lesson-creator" element={<LessonCreatorPage />} />
+        </Routes>
+      </main>
     </div>
   );
 }
