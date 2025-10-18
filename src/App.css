@@ -431,6 +431,7 @@ button:hover {
   text-align: left;
   background: #f0f2f5;
   border: 1px solid #ddd;
+  color: black;
 }
 .option-btn.selected {
   background-color: #cce0ff;

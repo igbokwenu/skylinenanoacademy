@@ -83,7 +83,7 @@ const LessonPreview = ({ lesson, onClose }) => {
               )}
               {lesson.quiz.map((q, index) => (
                 <div key={index} className="quiz-question">
-                  <p><strong className="quiz-question-text" style={{ color: '#000' }}>{index + 1}. {q.question}</strong></p>
+                  <p><strong className="quiz-question-text">{index + 1}. {q.question}</strong></p>
                   <div className="options-container">
                     {q.options.map(opt => {
                       let className = 'option-btn';
