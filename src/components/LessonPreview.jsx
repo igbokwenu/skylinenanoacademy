@@ -13,11 +13,10 @@ const LessonPreview = ({ lesson, onClose }) => {
   const [showQuiz, setShowQuiz] = useState(false);
   const [userAnswers, setUserAnswers] = useState({});
   const [submitted, setSubmitted] = useState(false);
+  const [feedback, setFeedback] = useState('');
 
   const { isLoading: isRewriting, executePrompt: executeRewrite } = useLanguageModel({ apiName: 'Rewriter' });
-  const { isLoading: isWriting, executePrompt: executeWrite } = useLanguageModel({ apiName: 'Writer' });
   const [isProofreading, setIsProofreading] = useState(false);
-
 
   const currentScene = editableLesson.lesson[currentSceneIndex];
   const totalScenes = editableLesson.lesson.length;
@@ -67,11 +66,13 @@ const LessonPreview = ({ lesson, onClose }) => {
 
   const handleEdit = (sceneId) => {
     setEditingSceneId(sceneId);
+    setFeedback('');
   };
 
   const handleCancelEdit = () => {
     setEditingSceneId(null);
     setEditableLesson(JSON.parse(JSON.stringify(lesson)));
+    setFeedback('');
   };
 
   const handleSceneTextChange = (sceneId, field, value) => {
@@ -83,25 +84,32 @@ const LessonPreview = ({ lesson, onClose }) => {
     }));
   };
 
-  const handleRewrite = async (sceneId, field) => {
-    const currentText = editableLesson.lesson.find(s => s.scene === sceneId)[field];
-    const rewrittenText = await executeRewrite(currentText, { context: rewritePrompt });
-    if (rewrittenText) {
-      handleSceneTextChange(sceneId, field, rewrittenText);
-    }
-  };
+  const handleRewrite = async (sceneId) => {
+    setFeedback('Rewriting scene...');
+    const scene = editableLesson.lesson.find(s => s.scene === sceneId);
+    const rewrittenParagraph = await executeRewrite(scene.paragraph, { context: rewritePrompt });
 
-  const handleWriteNewScene = async (sceneId) => {
-    const prompt = `Write a new scene for a lesson about "${lesson.title}". This is scene number ${sceneId}.`;
-    const newSceneText = await executeWrite(prompt);
-    if (newSceneText) {
-      handleSceneTextChange(sceneId, 'paragraph', newSceneText);
-      handleSceneTextChange(sceneId, 'image_prompt', 'A new image prompt related to the new scene.');
+    if (rewrittenParagraph) {
+        handleSceneTextChange(sceneId, 'paragraph', rewrittenParagraph);
+        setFeedback('Scene rewritten. Now rewriting image prompt...');
+
+        const imagePromptRewriteContext = `Based on this new scene, create a new image prompt: "${rewrittenParagraph}"`;
+        const rewrittenImagePrompt = await executeRewrite(scene.image_prompt, { context: imagePromptRewriteContext });
+
+        if (rewrittenImagePrompt) {
+            handleSceneTextChange(sceneId, 'image_prompt', rewrittenImagePrompt);
+            setFeedback('Scene and image prompt rewritten successfully!');
+        } else {
+            setFeedback('Scene rewritten, but failed to rewrite the image prompt.');
+        }
+    } else {
+        setFeedback('Failed to rewrite the scene.');
     }
   };
 
   const handleProofreadAndSave = async (sceneId) => {
     setIsProofreading(true);
+    setFeedback('Proofreading...');
     const scene = editableLesson.lesson.find(s => s.scene === sceneId);
     const textToProofread = `${scene.paragraph}\n\n${scene.image_prompt}`;
 
@@ -110,12 +118,15 @@ const LessonPreview = ({ lesson, onClose }) => {
         const result = await proofreader.proofread(textToProofread);
         if (result.corrections && result.corrections.length > 0) {
             setProofreadResult(result);
+            setFeedback('Proofreading complete. Please review the suggestions.');
         } else {
             setEditingSceneId(null);
+            setFeedback('No errors found. Changes saved.');
         }
     } catch (error) {
         console.error("Proofreading error:", error);
         setEditingSceneId(null);
+        setFeedback('Could not proofread. Changes saved without proofreading.');
     } finally {
         setIsProofreading(false);
     }
@@ -146,11 +157,13 @@ const LessonPreview = ({ lesson, onClose }) => {
     }));
     setProofreadResult(null);
     setEditingSceneId(null);
+    setFeedback('Corrections applied and changes saved.');
   };
 
   const handleIgnoreCorrection = () => {
     setProofreadResult(null);
     setEditingSceneId(null);
+    setFeedback('Corrections ignored. Changes saved.');
   };
 
 
@@ -169,39 +182,45 @@ const LessonPreview = ({ lesson, onClose }) => {
             <div className="scene-content">
               {editingSceneId === currentScene.scene ? (
                 <div className="scene-editor">
-                  <div className="edit-field">
-                    <label>Paragraph</label>
-                    <textarea
-                      value={currentScene.paragraph}
-                      onChange={(e) => handleSceneTextChange(currentScene.scene, 'paragraph', e.target.value)}
-                      rows={10}
-                    />
-                  </div>
-                  <div className="edit-field">
-                    <label>Image Prompt</label>
-                    <textarea
-                      value={currentScene.image_prompt}
-                      onChange={(e) => handleSceneTextChange(currentScene.scene, 'image_prompt', e.target.value)}
-                      rows={5}
-                    />
-                  </div>
-                  <div className="rewrite-section">
-                    <input
-                      type="text"
-                      value={rewritePrompt}
-                      onChange={(e) => setRewritePrompt(e.target.value)}
-                      placeholder="Rewrite prompt (e.g., make it funnier)"
-                    />
-                    <button onClick={() => handleRewrite(currentScene.scene, 'paragraph')} disabled={isRewriting}>Rewrite Paragraph</button>
-                    <button onClick={() => handleRewrite(currentScene.scene, 'image_prompt')} disabled={isRewriting}>Rewrite Image Prompt</button>
-                  </div>
-                  <div className="writer-section">
-                    <button onClick={() => handleWriteNewScene(currentScene.scene)} disabled={isWriting}>Write New Scene</button>
-                  </div>
-                  <div className="edit-actions">
-                    <button onClick={() => handleProofreadAndSave(currentScene.scene)} disabled={isProofreading}>Save Changes</button>
-                    <button onClick={handleCancelEdit}>Cancel</button>
-                  </div>
+                    <div className="editor-main-content">
+                        <div className="edit-field">
+                            <label>Paragraph</label>
+                            <textarea
+                            value={currentScene.paragraph}
+                            onChange={(e) => handleSceneTextChange(currentScene.scene, 'paragraph', e.target.value)}
+                            rows={10}
+                            />
+                        </div>
+                        <div className="edit-field">
+                            <label>Image Prompt</label>
+                            <textarea
+                            value={currentScene.image_prompt}
+                            onChange={(e) => handleSceneTextChange(currentScene.scene, 'image_prompt', e.target.value)}
+                            rows={5}
+                            />
+                        </div>
+                    </div>
+                    <div className="editor-sidebar">
+                        <div className="rewrite-section">
+                            <label>Rewrite Prompt</label>
+                            <textarea
+                                value={rewritePrompt}
+                                onChange={(e) => setRewritePrompt(e.target.value)}
+                                placeholder="e.g., Make the scene more dramatic and change the setting to a rainy night."
+                                rows={4}
+                            />
+                            <button onClick={() => handleRewrite(currentScene.scene)} disabled={isRewriting}>
+                                {isRewriting ? 'Rewriting...' : 'Rewrite Scene & Prompt'}
+                            </button>
+                        </div>
+                        <div className="edit-actions">
+                            <button onClick={() => handleProofreadAndSave(currentScene.scene)} disabled={isProofreading}>
+                                {isProofreading ? 'Saving...' : 'Save Changes'}
+                            </button>
+                            <button onClick={handleCancelEdit}>Cancel</button>
+                        </div>
+                        {feedback && <div className="feedback-box">{feedback}</div>}
+                    </div>
                 </div>
               ) : (
                 <>
