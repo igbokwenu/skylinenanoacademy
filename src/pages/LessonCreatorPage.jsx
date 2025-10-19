@@ -102,7 +102,6 @@ const LessonCreatorPage = () => {
   const [studentImageAnalysis, setStudentImageAnalysis] = useState({
     gender: '',
     ethnicity: '',
-    personalFacts: '',
     facialFeatures: ''
   });
   const [studentImageUse, setStudentImageUse] = useState('description');
@@ -239,7 +238,7 @@ const LessonCreatorPage = () => {
       role: 'user',
       content: [
         { type: 'image', value: file },
-        { type: 'text', value: 'Analyze the person in this image and provide their gender, ethnicity, any personal facts you can infer, and a description of their facial features. For the ethnicity, you must choose from one of the following options: "American Indian or Alaska Native", "Asian", "Black or African American", "White", "Hispanic or Latino", "Middle Eastern or North African (MENA)", "Native Hawaiian or Pacific Islander". Respond in JSON format with the keys: "gender", "ethnicity", "personalFacts", "facialFeatures".' }
+        { type: 'text', value: 'Analyze the person in this image and provide their gender, ethnicity, and a description of their facial features. For the ethnicity, you must choose from one of the following options: "American Indian or Alaska Native", "Asian", "Black or African American", "White", "Hispanic or Latino", "Middle Eastern or North African (MENA)", "Native Hawaiian or Pacific Islander". Respond in JSON format with the keys: "gender", "ethnicity", "facialFeatures".' }
       ]
     }];
 
@@ -248,10 +247,9 @@ const LessonCreatorPage = () => {
       properties: {
         gender: { type: 'string' },
         ethnicity: { type: 'string' },
-        personalFacts: { type: 'string' },
         facialFeatures: { type: 'string' }
       },
-      required: ['gender', 'ethnicity', 'personalFacts', 'facialFeatures']
+      required: ['gender', 'ethnicity', 'facialFeatures']
     };
 
     const result = await executeImageAnalysis(prompt, { responseConstraint: { schema: jsonSchema } });
@@ -263,7 +261,6 @@ const LessonCreatorPage = () => {
           ...prev,
           studentGender: parsedResult.gender,
           studentEthnicity: parsedResult.ethnicity,
-          studentPersonalFacts: `${prev.studentPersonalFacts} ${parsedResult.personalFacts}`.trim()
         }));
       }
     }
@@ -345,7 +342,7 @@ const LessonCreatorPage = () => {
                     <div className="setting-item">
                         <label>Upload Student Image</label>
                         <input type="file" accept="image/*" onChange={handleStudentImageUpload} />
-                        {isAnalysisLoading && <p>Analyzing image...</p>}
+                        {isAnalysisLoading && <div className="loader"></div>}
                     </div>
                     {studentImage && (
                         <>
@@ -363,7 +360,6 @@ const LessonCreatorPage = () => {
                                     <p><strong>Gender:</strong> {studentImageAnalysis.gender}</p>
                                     <p><strong>Ethnicity:</strong> {studentImageAnalysis.ethnicity}</p>
                                     <p><strong>Facial Features:</strong> {studentImageAnalysis.facialFeatures}</p>
-                                    <p><strong>Personal Facts:</strong> {studentImageAnalysis.personalFacts}</p>
                                 </div>
                             )}
                         </>
