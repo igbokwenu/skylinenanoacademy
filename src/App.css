@@ -185,10 +185,11 @@ button:hover {
   margin-bottom: 30px;
 }
 .lc-header-icon {
-  width: 50px;
-  height: 50px;
+  width: 100px;
+  height: 100px;
   margin-bottom: 10px;
-  filter: invert(33%) sepia(98%) saturate(3431%) hue-rotate(206deg) brightness(91%) contrast(95%);
+  border-radius: 50%;
+  border: 2px solid #ddd;
 }
 .lc-header h1 {
   margin-bottom: 5px;

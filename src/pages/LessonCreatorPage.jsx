@@ -4,7 +4,7 @@ import React, { useState, useMemo } from 'react';
 import { useLanguageModel } from '../hooks/useLanguageModel';
 import { useMonitorDownload } from '../hooks/useMonitorDownload';
 import LessonPreview from '../components/LessonPreview';
-import lessonCreatorIcon from '../assets/app_logo.svg';
+import lessonCreatorIcon from '../assets/skyline_nano_academy.png';
 
 // --- Configuration (Unchanged) ---
 const lessonParams = {
@@ -191,7 +191,7 @@ const LessonCreatorPage = () => {
       )}
       <div className="lc-header">
         <img src={lessonCreatorIcon} alt="Lesson Creator" className="lc-header-icon" />
-        <h1>AI-Powered Lesson Creator</h1>
+        <h1>Lesson Creator</h1>
         <p>Design engaging, story-driven lessons tailored to your students' needs.</p>
       </div>
       <div className="lc-main">
