@@ -181,45 +181,48 @@ const LessonPreview = ({ lesson, onClose }) => {
           {!showQuiz ? (
             <div className="scene-content">
               {editingSceneId === currentScene.scene ? (
-                <div className="scene-editor">
-                    <div className="editor-main-content">
+                <div className="scene-editor flex flex-col md:flex-row gap-4">
+                    <div className="editor-main-content flex-grow">
                         <div className="edit-field">
-                            <label>Paragraph</label>
+                            <label className="block font-bold mb-1">Paragraph</label>
                             <textarea
-                            value={currentScene.paragraph}
-                            onChange={(e) => handleSceneTextChange(currentScene.scene, 'paragraph', e.target.value)}
-                            rows={10}
+                                value={currentScene.paragraph}
+                                onChange={(e) => handleSceneTextChange(currentScene.scene, 'paragraph', e.target.value)}
+                                rows={10}
+                                className="w-full p-2 border rounded"
                             />
                         </div>
-                        <div className="edit-field">
-                            <label>Image Prompt</label>
+                        <div className="edit-field mt-4">
+                            <label className="block font-bold mb-1">Image Prompt</label>
                             <textarea
-                            value={currentScene.image_prompt}
-                            onChange={(e) => handleSceneTextChange(currentScene.scene, 'image_prompt', e.target.value)}
-                            rows={5}
+                                value={currentScene.image_prompt}
+                                onChange={(e) => handleSceneTextChange(currentScene.scene, 'image_prompt', e.target.value)}
+                                rows={5}
+                                className="w-full p-2 border rounded"
                             />
                         </div>
                     </div>
-                    <div className="editor-sidebar">
-                        <div className="rewrite-section">
-                            <label>Rewrite Prompt</label>
+                    <div className="editor-sidebar md:w-1/3">
+                        <div className="rewrite-section bg-gray-100 p-4 rounded">
+                            <label className="block font-bold mb-2">Rewrite Prompt</label>
                             <textarea
                                 value={rewritePrompt}
                                 onChange={(e) => setRewritePrompt(e.target.value)}
                                 placeholder="e.g., Make the scene more dramatic and change the setting to a rainy night."
                                 rows={4}
+                                className="w-full p-2 border rounded mb-2"
                             />
-                            <button onClick={() => handleRewrite(currentScene.scene)} disabled={isRewriting}>
+                            <button onClick={() => handleRewrite(currentScene.scene)} disabled={isRewriting} className="w-full bg-blue-500 text-white p-2 rounded hover:bg-blue-600 disabled:bg-blue-300 mb-4">
                                 {isRewriting ? 'Rewriting...' : 'Rewrite Scene & Prompt'}
                             </button>
                         </div>
-                        <div className="edit-actions">
-                            <button onClick={() => handleProofreadAndSave(currentScene.scene)} disabled={isProofreading}>
+                        <div className="edit-actions mt-4 flex gap-2">
+                            <button onClick={() => handleProofreadAndSave(currentScene.scene)} disabled={isProofreading} className="flex-1 bg-green-500 text-white p-2 rounded hover:bg-green-600 disabled:bg-green-300">
                                 {isProofreading ? 'Saving...' : 'Save Changes'}
                             </button>
-                            <button onClick={handleCancelEdit}>Cancel</button>
+                            <button onClick={handleCancelEdit} className="flex-1 bg-gray-500 text-white p-2 rounded hover:bg-gray-600">Cancel</button>
                         </div>
-                        {feedback && <div className="feedback-box">{feedback}</div>}
+                        {feedback && <div className="feedback-box mt-4 p-2 bg-yellow-100 border border-yellow-400 text-yellow-700 rounded">{feedback}</div>}
                     </div>
                 </div>
               ) : (

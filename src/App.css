@@ -533,32 +533,6 @@ button:hover {
   100% { transform: rotate(360deg); }
 }
 
-.scene-editor {
-    display: grid;
-    grid-template-columns: 2fr 1fr;
-    gap: 20px;
-}
-
-.editor-main-content {
-    display: flex;
-    flex-direction: column;
-    gap: 15px;
-}
-
-.editor-sidebar {
-    display: flex;
-    flex-direction: column;
-    gap: 20px;
-}
-
-.edit-field label, .rewrite-section label {
-    font-weight: bold;
-    margin-bottom: 5px;
-}
-
-.rewrite-section textarea {
-    width: 95%;
-}
 
 .feedback-box {
     margin-top: 15px;
