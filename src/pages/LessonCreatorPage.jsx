@@ -238,28 +238,29 @@ const LessonCreatorPage = () => {
                   <label htmlFor="studentName">Student's Name</label>
                   <input type="text" id="studentName" name="studentName" value={settings.studentName} onChange={handleSettingChange} placeholder="Enter name for immersive story" />
                 </div>
-                <div className="setting-item">
-                  <label htmlFor="studentGender">Student's Gender</label>
-                  <select id="studentGender" name="studentGender" value={settings.studentGender} onChange={handleSettingChange}>
-                    <option value="">Select Gender</option>
-                    <option value="Male">Male</option>
-                    <option value="Female">Female</option>
-                    <option value="Other">Other</option>
-                  </select>
-                </div>
-                <div className="setting-item">
-                  <label htmlFor="studentEthnicity">Student's Ethnicity</label>
-                  <select id="studentEthnicity" name="studentEthnicity" value={settings.studentEthnicity} onChange={handleSettingChange}>
-                    <option value="">Select Ethnicity</option>
-                    <option value="American Indian or Alaska Native">American Indian or Alaska Native</option>
-                    <option value="Asian">Asian</option>
-                    <option value="Black or African American">Black or African American</option>
-                    <option value="White">White</option>
-                    <option value="Hispanic or Latino">Hispanic or Latino</option>
-                    <option value="Middle Eastern or North African (MENA)">Middle Eastern or North African (MENA)</option>
-                    <option value="Native Hawaiian or Pacific Islander">Native Hawaiian or Pacific Islander</option>
-                    
-                  </select>
+                <div className="immersive-grid">
+                  <div className="setting-item">
+                    <label htmlFor="studentGender">Student's Gender</label>
+                    <select id="studentGender" name="studentGender" value={settings.studentGender} onChange={handleSettingChange}>
+                      <option value="">Select Gender</option>
+                      <option value="Male">Male</option>
+                      <option value="Female">Female</option>
+                      <option value="Other">Other</option>
+                    </select>
+                  </div>
+                  <div className="setting-item">
+                    <label htmlFor="studentEthnicity">Student's Ethnicity</label>
+                    <select id="studentEthnicity" name="studentEthnicity" value={settings.studentEthnicity} onChange={handleSettingChange}>
+                      <option value="">Select Ethnicity</option>
+                      <option value="American Indian or Alaska Native">American Indian or Alaska Native</option>
+                      <option value="Asian">Asian</option>
+                      <option value="Black or African American">Black or African American</option>
+                      <option value="Hispanic or Latino">Hispanic or Latino</option>
+                      <option value="Middle Eastern or North African (MENA)">Middle Eastern or North African (MENA)</option>
+                      <option value="Native Hawaiian or Pacific Islander">Native Hawaiian or Pacific Islander</option>
+                      <option value="White">White</option>
+                    </select>
+                  </div>
                 </div>
                 <div className="setting-item student-name-input">
                   <label htmlFor="studentPersonalFacts">Personal Facts</label>

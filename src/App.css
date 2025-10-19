@@ -201,7 +201,7 @@ button:hover {
 
 .lc-main {
   display: grid;
-  grid-template-columns: 2fr 1fr;
+  grid-template-columns: 1fr 1.5fr;
   gap: 25px;
 }
 
@@ -509,4 +509,11 @@ button:hover {
   cursor: pointer;
   border-radius: 6px;
   margin-bottom: 5px;
+}
+
+.immersive-grid {
+  grid-column: 1 / -1; /* Span the full width of the parent grid */
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 15px;
 }
