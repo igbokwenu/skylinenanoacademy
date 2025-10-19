@@ -249,7 +249,17 @@ const LessonCreatorPage = () => {
                 </div>
                 <div className="setting-item">
                   <label htmlFor="studentEthnicity">Student's Ethnicity</label>
-                  <input type="text" id="studentEthnicity" name="studentEthnicity" value={settings.studentEthnicity} onChange={handleSettingChange} placeholder="Enter ethnicity" />
+                  <select id="studentEthnicity" name="studentEthnicity" value={settings.studentEthnicity} onChange={handleSettingChange}>
+                    <option value="">Select Ethnicity</option>
+                    <option value="American Indian or Alaska Native">American Indian or Alaska Native</option>
+                    <option value="Asian">Asian</option>
+                    <option value="Black or African American">Black or African American</option>
+                    <option value="White">White</option>
+                    <option value="Hispanic or Latino">Hispanic or Latino</option>
+                    <option value="Middle Eastern or North African (MENA)">Middle Eastern or North African (MENA)</option>
+                    <option value="Native Hawaiian or Pacific Islander">Native Hawaiian or Pacific Islander</option>
+                    
+                  </select>
                 </div>
                 <div className="setting-item student-name-input">
                   <label htmlFor="studentPersonalFacts">Personal Facts</label>
