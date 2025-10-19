@@ -246,25 +246,46 @@ const LessonPreview = ({ lesson, onClose }) => {
                   </div>
                   <div className="editor-sidebar w-full md:w-1/2 flex flex-col gap-4">
                     <div className="rewrite-section bg-gray-100 p-4 rounded">
-                        <label className="block font-bold mb-2">Rewrite Prompt</label>
-                        <textarea
-                            value={rewritePrompt}
-                            onChange={(e) => setRewritePrompt(e.target.value)}
-                            placeholder="e.g., Make the scene more dramatic and change the setting to a rainy night."
-                            rows={4}
-                            className="w-full p-2 border rounded mb-2"
-                        />
+                      <label className="block font-bold mb-2">
+                        Rewrite Prompt
+                      </label>
+                      <textarea
+                        value={rewritePrompt}
+                        onChange={(e) => setRewritePrompt(e.target.value)}
+                        placeholder="e.g., Make the scene more dramatic and change the setting to a rainy night."
+                        rows={4}
+                        className="w-full p-2 border rounded mb-2"
+                      />
                     </div>
                     <div className="edit-actions flex flex-col gap-2">
-                        <button onClick={() => handleRewrite(currentScene.scene)} disabled={isRewriting} className="w-full bg-blue-500 text-white p-2 rounded hover:bg-blue-600 disabled:bg-blue-300">
-                            {isRewriting ? 'Rewriting...' : 'Rewrite Scene'}
-                        </button>
-                        <button onClick={() => handleProofreadAndSave(currentScene.scene)} disabled={isProofreading} className="w-full bg-green-500 text-white p-2 rounded hover:bg-green-600 disabled:bg-green-300">
-                            {isProofreading ? 'Saving...' : 'Save Changes'}
-                        </button>
-                        <button onClick={handleCancelEdit} className="w-full bg-gray-500 text-white p-2 rounded hover:bg-gray-600">Cancel</button>
+                      <button
+                        onClick={() => handleRewrite(currentScene.scene)}
+                        disabled={isRewriting}
+                        className="w-full bg-blue-500 text-white p-2 rounded hover:bg-blue-600 disabled:bg-blue-300"
+                      >
+                        {isRewriting ? "Rewriting..." : "Rewrite Scene"}
+                      </button>
+                      <button
+                        onClick={() =>
+                          handleProofreadAndSave(currentScene.scene)
+                        }
+                        disabled={isProofreading}
+                        className="w-full bg-green-500 text-white p-2 rounded hover:bg-green-600 disabled:bg-green-300"
+                      >
+                        {isProofreading ? "Saving..." : "Save Changes"}
+                      </button>
+                      <button
+                        onClick={handleCancelEdit}
+                        className="w-full bg-gray-500 text-white p-2 rounded hover:bg-gray-600"
+                      >
+                        Cancel
+                      </button>
                     </div>
-                    {feedback && <div className="feedback-box mt-4 p-2 bg-yellow-100 border border-yellow-400 text-yellow-700 rounded">{feedback}</div>}
+                    {feedback && (
+                      <div className="feedback-box mt-4 p-2 bg-yellow-100 border border-yellow-400 text-yellow-700 rounded">
+                        {feedback}
+                      </div>
+                    )}
                   </div>
                 </div>
               ) : (
