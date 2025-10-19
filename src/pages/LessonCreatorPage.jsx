@@ -84,7 +84,10 @@ const LessonCreatorPage = () => {
     tone: lessonParams.tones[1],
     ageGroup: lessonParams.ageGroups[1],
     perspective: lessonParams.perspectives[0],
-    studentName: ''
+    studentName: '',
+    studentGender: '',
+    studentEthnicity: '',
+    studentPersonalFacts: ''
   });
   // NEW: State for adjustable scene count
   const [sceneCount, setSceneCount] = useState(5); 
@@ -131,9 +134,22 @@ const LessonCreatorPage = () => {
 
   // FEATURE UPDATE: The prompt now includes the dynamic sceneCount.
   const userRequestPrompt = useMemo(() => {
-    let studentInfo = settings.perspective.includes('Immersive') && settings.studentName
-      ? `The main character is a student named "${settings.studentName}".`
-      : '';
+    let studentInfo = '';
+    if (settings.perspective.includes('Immersive')) {
+      studentInfo = `The main character is a student.`;
+      if (settings.studentName) {
+        studentInfo += ` Their name is "${settings.studentName}".`;
+      }
+      if (settings.studentGender) {
+        studentInfo += ` Their gender is ${settings.studentGender}.`;
+      }
+      if (settings.studentEthnicity) {
+        studentInfo += ` Their ethnicity is ${settings.studentEthnicity}.`;
+      }
+      if (settings.studentPersonalFacts) {
+        studentInfo += ` Here are some personal facts about them: ${settings.studentPersonalFacts}.`;
+      }
+    }
   
     return `
       Create the content for a JSON object representing a lesson.
@@ -217,10 +233,29 @@ const LessonCreatorPage = () => {
                </div>
             ))}
             {settings.perspective.includes('Immersive') && (
-              <div className="setting-item student-name-input">
-                <label htmlFor="studentName">Student's Name</label>
-                <input type="text" id="studentName" name="studentName" value={settings.studentName} onChange={handleSettingChange} placeholder="Enter name for immersive story" />
-              </div>
+              <>
+                <div className="setting-item student-name-input">
+                  <label htmlFor="studentName">Student's Name</label>
+                  <input type="text" id="studentName" name="studentName" value={settings.studentName} onChange={handleSettingChange} placeholder="Enter name for immersive story" />
+                </div>
+                <div className="setting-item">
+                  <label htmlFor="studentGender">Student's Gender</label>
+                  <select id="studentGender" name="studentGender" value={settings.studentGender} onChange={handleSettingChange}>
+                    <option value="">Select Gender</option>
+                    <option value="Male">Male</option>
+                    <option value="Female">Female</option>
+                    <option value="Other">Other</option>
+                  </select>
+                </div>
+                <div className="setting-item">
+                  <label htmlFor="studentEthnicity">Student's Ethnicity</label>
+                  <input type="text" id="studentEthnicity" name="studentEthnicity" value={settings.studentEthnicity} onChange={handleSettingChange} placeholder="Enter ethnicity" />
+                </div>
+                <div className="setting-item student-name-input">
+                  <label htmlFor="studentPersonalFacts">Personal Facts</label>
+                  <textarea id="studentPersonalFacts" name="studentPersonalFacts" value={settings.studentPersonalFacts} onChange={handleSettingChange} maxLength="180" placeholder="You can input other interesting or personal facts to further personalize the lesson. (max 180 characters)"></textarea>
+                </div>
+              </>
             )}
                         {/* NEW: Slider for Scene/Quiz Count */}
             <div className="setting-item scene-count-slider">
