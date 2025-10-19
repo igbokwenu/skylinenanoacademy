@@ -239,7 +239,7 @@ const LessonCreatorPage = () => {
       role: 'user',
       content: [
         { type: 'image', value: file },
-        { type: 'text', value: 'Analyze the person in this image and provide their gender, ethnicity, any personal facts you can infer, and a description of their facial features. Respond in JSON format with the keys: "gender", "ethnicity", "personalFacts", "facialFeatures".' }
+        { type: 'text', value: 'Analyze the person in this image and provide their gender, ethnicity, any personal facts you can infer, and a description of their facial features. For the ethnicity, you must choose from one of the following options: "American Indian or Alaska Native", "Asian", "Black or African American", "White", "Hispanic or Latino", "Middle Eastern or North African (MENA)", "Native Hawaiian or Pacific Islander". Respond in JSON format with the keys: "gender", "ethnicity", "personalFacts", "facialFeatures".' }
       ]
     }];
 
