@@ -385,10 +385,10 @@ const LessonCreatorPage = () => {
                           <option value="American Indian or Alaska Native">American Indian or Alaska Native</option>
                           <option value="Asian">Asian</option>
                           <option value="Black or African American">Black or African American</option>
+                           <option value="White">White</option>
                           <option value="Hispanic or Latino">Hispanic or Latino</option>
                           <option value="Middle Eastern or North African (MENA)">Middle Eastern or North African (MENA)</option>
                           <option value="Native Hawaiian or Pacific Islander">Native Hawaiian or Pacific Islander</option>
-                          <option value="White">White</option>
                         </select>
                       </div>
                     </div>
