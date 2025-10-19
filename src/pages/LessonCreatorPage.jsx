@@ -295,7 +295,7 @@ const LessonCreatorPage = () => {
         <LessonPreview lesson={generatedLesson} onClose={() => setIsPreviewVisible(false)} />
       )}
       <div className="lc-header">
-        <img src={lessonCreatorIcon} alt="Lesson Creator" className="lc-header-icon" />
+        {/* <img src={lessonCreatorIcon} alt="Lesson Creator" className="lc-header-icon" /> */}
         <h1>Lesson Creator</h1>
         <p>Design engaging, story-driven lessons tailored to your students' needs.</p>
       </div>
