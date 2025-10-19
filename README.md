@@ -17,3 +17,5 @@ rm -rf /Users/increase/.nvm/versions/node/v22.12.0/lib/node_modules/@google/gemi
 
 npm run build
 firebase deploy --only hosting
+//Deploying the app this command will run a script that builds the app and deploys it to Firebase Hosting:
+npm run deploy
