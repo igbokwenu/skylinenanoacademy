@@ -213,7 +213,7 @@ const LessonPreview = ({ lesson, onClose }) => {
                                 className="w-full p-2 border rounded mb-2"
                             />
                             <button onClick={() => handleRewrite(currentScene.scene)} disabled={isRewriting} className="w-full bg-blue-500 text-white p-2 rounded hover:bg-blue-600 disabled:bg-blue-300 mb-4">
-                                {isRewriting ? 'Rewriting...' : 'Rewrite Scene & Prompt'}
+                                {isRewriting ? 'Rewriting...' : 'Rewrite Scene'}
                             </button>
                         </div>
                         <div className="edit-actions mt-4 flex gap-2">
