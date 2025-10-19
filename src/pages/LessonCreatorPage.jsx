@@ -264,7 +264,7 @@ const LessonCreatorPage = () => {
                 </div>
                 <div className="setting-item student-name-input">
                   <label htmlFor="studentPersonalFacts">Personal Facts</label>
-                  <textarea id="studentPersonalFacts" name="studentPersonalFacts" value={settings.studentPersonalFacts} onChange={handleSettingChange} maxLength="180" placeholder="You can input other interesting or personal facts to further personalize the lesson. (max 180 characters)"></textarea>
+                  <textarea id="studentPersonalFacts" name="studentPersonalFacts" value={settings.studentPersonalFacts} onChange={handleSettingChange} maxLength="180" placeholder="You can input other interesting or personal facts to further personalize the lesson. e.g., Loves to play the guitar, has a pet cat named Randy, favorite; food, cartoon, Pokemon, etc. (max 180 characters)"></textarea>
                 </div>
               </>
             )}
