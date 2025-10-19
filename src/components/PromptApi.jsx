@@ -7,10 +7,12 @@ import { useMonitorDownload } from '../hooks/useMonitorDownload';
 const PromptApi = () => {
   const [promptInput, setPromptInput] = useState('What is the weather in Tokyo? Then, create a character sheet for a gnome wizard in JSON format.');
   const [imageFile, setImageFile] = useState(null);
+  const [imageDescriptionOutput, setImageDescriptionOutput] = useState('');
   const imageInputRef = useRef(null);
   const { getMonitor } = useMonitorDownload();
 
   const creationOptions = {
+    expectedInputs: [{ type: 'image' }, { type: 'text', languages: ['en'] }],
     tools: [{
       name: "getWeather",
       description: "Get the current weather in a specific location.",
@@ -60,6 +62,20 @@ const PromptApi = () => {
     await executePrompt(finalPrompt, { responseConstraint: jsonSchema }, getMonitor());
   };
 
+  const handleDescribeImage = async () => {
+    if (!imageFile) return;
+    setImageDescriptionOutput('');
+    const prompt = [{
+      role: "user",
+      content: [
+        { type: "image", value: imageFile },
+        { type: "text", value: "Describe this image." },
+      ],
+    }];
+    const result = await executePrompt(prompt, {}, getMonitor());
+    setImageDescriptionOutput(result);
+  };
+
   return (
     <div className="api-card">
       <h2>Prompt API (Advanced Features)</h2>
@@ -75,6 +91,7 @@ const PromptApi = () => {
       
       <div className="button-group">
         <button onClick={handleRunPrompt} disabled={isLoading}>{isLoading ? 'Running...' : 'Run Prompt'}</button>
+        <button onClick={handleDescribeImage} disabled={!imageFile || isLoading}>{isLoading ? 'Running...' : 'Describe Image'}</button>
         <button onClick={abortCurrentPrompt} disabled={!isLoading}>Abort</button>
         <button onClick={cloneCurrentSession} disabled={isLoading}>Clone Session</button>
         <button onClick={destroySession} disabled={isLoading}>Destroy Session</button>
@@ -86,6 +103,7 @@ const PromptApi = () => {
       </div>
 
       <pre className="output">{output}</pre>
+      {imageDescriptionOutput && <pre className="output">{imageDescriptionOutput}</pre>}
     </div>
   );
 };
