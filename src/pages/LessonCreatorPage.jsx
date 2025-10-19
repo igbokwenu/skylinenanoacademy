@@ -238,7 +238,7 @@ const LessonCreatorPage = () => {
       role: 'user',
       content: [
         { type: 'image', value: file },
-        { type: 'text', value: 'Analyze the person in this image and provide their gender ( Select from exactly: Male, Female, Other), ethnicity, and a description of their facial features. For the ethnicity, you must choose from one of the following options: "American Indian or Alaska Native", "Asian", "Black or African American", "White", "Hispanic or Latino", "Middle Eastern or North African (MENA)", "Native Hawaiian or Pacific Islander". Respond in JSON format with the keys: "gender", "ethnicity", "facialFeatures".' }
+        { type: 'text', value: 'Analyze the person in this image and provide their gender ( Select from exactly: Male, Female, Other), ethnicity, and a detailed description of their facial features suitable for creating an animated character. Focus on key characteristics like eye shape and color, nose shape, mouth shape, jawline, and any distinctive features like freckles, scars, or glasses. For the ethnicity, you must choose from one of the following options: "American Indian or Alaska Native", "Asian", "Black or African American", "White", "Hispanic or Latino", "Middle Eastern or North African (MENA)", "Native Hawaiian or Pacific Islander". Respond in JSON format with the keys: "gender", "ethnicity", "facialFeatures".' }
       ]
     }];
 
