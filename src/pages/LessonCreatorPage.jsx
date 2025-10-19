@@ -89,12 +89,23 @@ const LessonCreatorPage = () => {
     studentEthnicity: '',
     studentPersonalFacts: ''
   });
-  // NEW: State for adjustable scene count
   const [sceneCount, setSceneCount] = useState(5); 
   const [generatedLesson, setGeneratedLesson] = useState(null);
   const [isPreviewVisible, setIsPreviewVisible] = useState(false);
   const [generationError, setGenerationError] = useState(null);
   const [isStreamVisible, setIsStreamVisible] = useState(false);
+  const [characterMode, setCharacterMode] = useState('student');
+  const [customCharacterImage, setCustomCharacterImage] = useState(null);
+  const [customCharacterDescription, setCustomCharacterDescription] = useState('');
+  const [customCharacterImageUse, setCustomCharacterImageUse] = useState('direct');
+  const [studentImage, setStudentImage] = useState(null);
+  const [studentImageAnalysis, setStudentImageAnalysis] = useState({
+    gender: '',
+    ethnicity: '',
+    personalFacts: '',
+    facialFeatures: ''
+  });
+  const [studentImageUse, setStudentImageUse] = useState('description');
 
   const { getMonitor } = useMonitorDownload();
   const { 
@@ -102,7 +113,12 @@ const LessonCreatorPage = () => {
     executePrompt, abortCurrentPrompt, tokenInfo
   } = useLanguageModel({ apiName: 'LanguageModel' });
 
-  // FEATURE UPDATE: The schema is now dynamic based on sceneCount.
+  const {
+    isLoading: isAnalysisLoading,
+    output: analysisOutput,
+    executePrompt: executeImageAnalysis
+  } = useLanguageModel({ apiName: 'LanguageModel', creationOptions: { expectedInputs: [{ type: 'image' }, { type: 'text' }] } });
+
   const lessonSchema = useMemo(() => ({
     type: "object",
     properties: {
@@ -129,25 +145,33 @@ const LessonCreatorPage = () => {
       }
     },
     required: ["title", "lesson", "quiz"]
-  }), [sceneCount]); // Re-generate the schema whenever sceneCount changes.
+  }), [sceneCount]);
 
-
-  // FEATURE UPDATE: The prompt now includes the dynamic sceneCount.
   const userRequestPrompt = useMemo(() => {
     let studentInfo = '';
     if (settings.perspective.includes('Immersive')) {
-      studentInfo = `The main character is a student.`;
-      if (settings.studentName) {
-        studentInfo += ` Their name is "${settings.studentName}".`;
-      }
-      if (settings.studentGender) {
-        studentInfo += ` Their gender is ${settings.studentGender}.`;
-      }
-      if (settings.studentEthnicity) {
-        studentInfo += ` Their ethnicity is ${settings.studentEthnicity}.`;
-      }
-      if (settings.studentPersonalFacts) {
-        studentInfo += ` Here are some personal facts about them: ${settings.studentPersonalFacts}.`;
+      if (characterMode === 'student') {
+        studentInfo = `The main character is a student.`;
+        if (settings.studentName) {
+          studentInfo += ` Their name is "${settings.studentName}".`;
+        }
+        if (studentImageUse === 'description') {
+          if (studentImageAnalysis.gender) studentInfo += ` Their gender is ${studentImageAnalysis.gender}.`;
+          if (studentImageAnalysis.ethnicity) studentInfo += ` Their ethnicity is ${studentImageAnalysis.ethnicity}.`;
+          if (studentImageAnalysis.facialFeatures) studentInfo += ` Facial features: ${studentImageAnalysis.facialFeatures}.`;
+          if (studentImageAnalysis.personalFacts) studentInfo += ` Personal facts: ${studentImageAnalysis.personalFacts}.`;
+        } else {
+            if (settings.studentGender) studentInfo += ` Their gender is ${settings.studentGender}.`;
+            if (settings.studentEthnicity) studentInfo += ` Their ethnicity is ${settings.studentEthnicity}.`;
+        }
+        if (settings.studentPersonalFacts) {
+          studentInfo += ` Here are some personal facts about them: ${settings.studentPersonalFacts}.`;
+        }
+      } else {
+        studentInfo = `The main character is a custom character.`;
+        if (customCharacterDescription) {
+            studentInfo += ` Description: ${customCharacterDescription}.`;
+        }
       }
     }
   
@@ -166,15 +190,22 @@ const LessonCreatorPage = () => {
       For each of the ${sceneCount} scenes, create a detailed 'image_prompt' and a 'paragraph'.
       For each of the ${sceneCount} quiz questions, create a 'question', 4 'options', and an 'answer'.
     `;
-  }, [settings, sceneCount]); // Re-generate the prompt if settings or sceneCount change.
+  }, [settings, sceneCount, characterMode, studentImageUse, studentImageAnalysis, customCharacterDescription]);
 
   const handleCreateLesson = async () => {
     setIsPreviewVisible(false);
     setGeneratedLesson(null);
     setGenerationError(null);
     
+    let promptToExecute = userRequestPrompt;
+    if (settings.perspective.includes('Immersive') && characterMode === 'student' && studentImage && studentImageUse === 'direct') {
+        promptToExecute = [{ role: 'user', content: [{ type: 'image', value: studentImage }, { type: 'text', value: userRequestPrompt }] }];
+    } else if (settings.perspective.includes('Immersive') && characterMode === 'custom' && customCharacterImage && customCharacterImageUse === 'direct') {
+        promptToExecute = [{ role: 'user', content: [{ type: 'image', value: customCharacterImage }, { type: 'text', value: userRequestPrompt }] }];
+    }
+
     const rawAiResult = await executePrompt(
-        userRequestPrompt, 
+        promptToExecute, 
         { responseConstraint: lessonSchema },
         getMonitor()
     );
@@ -199,8 +230,69 @@ const LessonCreatorPage = () => {
     setSettings(prev => ({ ...prev, [name]: value }));
   };
 
+  const handleStudentImageUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setStudentImage(file);
+
+    const prompt = [{
+      role: 'user',
+      content: [
+        { type: 'image', value: file },
+        { type: 'text', value: 'Analyze the person in this image and provide their gender, ethnicity, any personal facts you can infer, and a description of their facial features. Respond in JSON format with the keys: "gender", "ethnicity", "personalFacts", "facialFeatures".' }
+      ]
+    }];
+
+    const jsonSchema = {
+      type: 'object',
+      properties: {
+        gender: { type: 'string' },
+        ethnicity: { type: 'string' },
+        personalFacts: { type: 'string' },
+        facialFeatures: { type: 'string' }
+      },
+      required: ['gender', 'ethnicity', 'personalFacts', 'facialFeatures']
+    };
+
+    const result = await executeImageAnalysis(prompt, { responseConstraint: { schema: jsonSchema } });
+    if (result) {
+      const parsedResult = cleanAndParseJson(result);
+      if (parsedResult) {
+        setStudentImageAnalysis(parsedResult);
+        setSettings(prev => ({
+          ...prev,
+          studentGender: parsedResult.gender,
+          studentEthnicity: parsedResult.ethnicity,
+          studentPersonalFacts: `${prev.studentPersonalFacts} ${parsedResult.personalFacts}`.trim()
+        }));
+      }
+    }
+  };
+
+  const handleCustomCharacterImageUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setCustomCharacterImage(file);
+  };
+
+  const handleGenerateCustomCharacterDescription = async () => {
+    if (!customCharacterImage) return;
+
+    const prompt = [{
+      role: 'user',
+      content: [
+        { type: 'image', value: customCharacterImage },
+        { type: 'text', value: 'Describe the character in this image.' }
+      ]
+    }];
+
+    const result = await executeImageAnalysis(prompt);
+    if (result) {
+      setCustomCharacterDescription(result);
+    }
+  };
+
   return (
-    // The JSX for the component remains unchanged. The fixes are in the logic.
     <div className="lesson-creator-container">
       {isPreviewVisible && generatedLesson && (
         <LessonPreview lesson={generatedLesson} onClose={() => setIsPreviewVisible(false)} />
@@ -234,41 +326,105 @@ const LessonCreatorPage = () => {
             ))}
             {settings.perspective.includes('Immersive') && (
               <>
-                <div className="setting-item student-name-input">
-                  <label htmlFor="studentName">Student's Name</label>
-                  <input type="text" id="studentName" name="studentName" value={settings.studentName} onChange={handleSettingChange} placeholder="Enter name for immersive story" />
-                </div>
-                <div className="immersive-grid">
-                  <div className="setting-item">
-                    <label htmlFor="studentGender">Student's Gender</label>
-                    <select id="studentGender" name="studentGender" value={settings.studentGender} onChange={handleSettingChange}>
-                      <option value="">Select Gender</option>
-                      <option value="Male">Male</option>
-                      <option value="Female">Female</option>
-                      <option value="Other">Other</option>
-                    </select>
-                  </div>
-                  <div className="setting-item">
-                    <label htmlFor="studentEthnicity">Student's Ethnicity</label>
-                    <select id="studentEthnicity" name="studentEthnicity" value={settings.studentEthnicity} onChange={handleSettingChange}>
-                      <option value="">Select Ethnicity</option>
-                      <option value="American Indian or Alaska Native">American Indian or Alaska Native</option>
-                      <option value="Asian">Asian</option>
-                      <option value="Black or African American">Black or African American</option>
-                      <option value="Hispanic or Latino">Hispanic or Latino</option>
-                      <option value="Middle Eastern or North African (MENA)">Middle Eastern or North African (MENA)</option>
-                      <option value="Native Hawaiian or Pacific Islander">Native Hawaiian or Pacific Islander</option>
-                      <option value="White">White</option>
-                    </select>
+                <div className="setting-item">
+                  <label>Character Mode</label>
+                  <div>
+                    <input type="radio" id="student-char" name="characterMode" value="student" checked={characterMode === 'student'} onChange={() => setCharacterMode('student')} />
+                    <label htmlFor="student-char">Student as a character</label>
+                    <input type="radio" id="custom-char" name="characterMode" value="custom" checked={characterMode === 'custom'} onChange={() => setCharacterMode('custom')} />
+                    <label htmlFor="custom-char">Select Character</label>
                   </div>
                 </div>
-                <div className="setting-item student-name-input">
-                  <label htmlFor="studentPersonalFacts">Personal Facts</label>
-                  <textarea id="studentPersonalFacts" name="studentPersonalFacts" value={settings.studentPersonalFacts} onChange={handleSettingChange} maxLength="180" placeholder="You can input other interesting or personal facts to further personalize the lesson. e.g., Loves to play the guitar, has a pet cat named Randy, favorite; food, cartoon, Pokemon, etc. (max 180 characters)"></textarea>
-                </div>
+
+                {characterMode === 'student' && (
+                  <>
+                    <div className="setting-item student-name-input">
+                      <label htmlFor="studentName">Student's Name</label>
+                      <input type="text" id="studentName" name="studentName" value={settings.studentName} onChange={handleSettingChange} placeholder="Enter name for immersive story" />
+                    </div>
+                    <div className="setting-item">
+                        <label>Upload Student Image</label>
+                        <input type="file" accept="image/*" onChange={handleStudentImageUpload} />
+                        {isAnalysisLoading && <p>Analyzing image...</p>}
+                    </div>
+                    {studentImage && (
+                        <>
+                            <div className="setting-item">
+                                <label>Image Usage</label>
+                                <div>
+                                    <input type="radio" id="student-direct" name="studentImageUse" value="direct" checked={studentImageUse === 'direct'} onChange={() => setStudentImageUse('direct')} />
+                                    <label htmlFor="student-direct">Use Image Directly</label>
+                                    <input type="radio" id="student-desc" name="studentImageUse" value="description" checked={studentImageUse === 'description'} onChange={() => setStudentImageUse('description')} />
+                                    <label htmlFor="student-desc">Use Image Description</label>
+                                </div>
+                            </div>
+                            {studentImageUse === 'description' && (
+                                <div className="image-analysis-results">
+                                    <p><strong>Gender:</strong> {studentImageAnalysis.gender}</p>
+                                    <p><strong>Ethnicity:</strong> {studentImageAnalysis.ethnicity}</p>
+                                    <p><strong>Facial Features:</strong> {studentImageAnalysis.facialFeatures}</p>
+                                    <p><strong>Personal Facts:</strong> {studentImageAnalysis.personalFacts}</p>
+                                </div>
+                            )}
+                        </>
+                    )}
+                    <div className="immersive-grid">
+                      <div className="setting-item">
+                        <label htmlFor="studentGender">Student's Gender</label>
+                        <select id="studentGender" name="studentGender" value={settings.studentGender} onChange={handleSettingChange}>
+                          <option value="">Select Gender</option>
+                          <option value="Male">Male</option>
+                          <option value="Female">Female</option>
+                          <option value="Other">Other</option>
+                        </select>
+                      </div>
+                      <div className="setting-item">
+                        <label htmlFor="studentEthnicity">Student's Ethnicity</label>
+                        <select id="studentEthnicity" name="studentEthnicity" value={settings.studentEthnicity} onChange={handleSettingChange}>
+                          <option value="">Select Ethnicity</option>
+                          <option value="American Indian or Alaska Native">American Indian or Alaska Native</option>
+                          <option value="Asian">Asian</option>
+                          <option value="Black or African American">Black or African American</option>
+                          <option value="Hispanic or Latino">Hispanic or Latino</option>
+                          <option value="Middle Eastern or North African (MENA)">Middle Eastern or North African (MENA)</option>
+                          <option value="Native Hawaiian or Pacific Islander">Native Hawaiian or Pacific Islander</option>
+                          <option value="White">White</option>
+                        </select>
+                      </div>
+                    </div>
+                    <div className="setting-item student-name-input">
+                      <label htmlFor="studentPersonalFacts">Personal Facts</label>
+                      <textarea id="studentPersonalFacts" name="studentPersonalFacts" value={settings.studentPersonalFacts} onChange={handleSettingChange} maxLength="180" placeholder="You can input other interesting or personal facts to further personalize the lesson. e.g., Loves to play the guitar, has a pet cat named Randy, favorite; food, cartoon, Pokemon, etc. (max 180 characters)"></textarea>
+                    </div>
+                  </>
+                )}
+
+                {characterMode === 'custom' && (
+                    <>
+                        <div className="setting-item">
+                            <label>Upload Character Image</label>
+                            <input type="file" accept="image/*" onChange={handleCustomCharacterImageUpload} />
+                        </div>
+                        <div className="setting-item">
+                            <label>Character Description</label>
+                            <textarea value={customCharacterDescription} onChange={(e) => setCustomCharacterDescription(e.target.value)} placeholder="Optionally describe the character." />
+                            <button onClick={handleGenerateCustomCharacterDescription} disabled={!customCharacterImage || isAnalysisLoading}>
+                                {isAnalysisLoading ? 'Generating...' : 'Generate Description from Image'}
+                            </button>
+                        </div>
+                        <div className="setting-item">
+                            <label>Image Usage</label>
+                            <div>
+                                <input type="radio" id="custom-direct" name="customImageUse" value="direct" checked={customCharacterImageUse === 'direct'} onChange={() => setCustomCharacterImageUse('direct')} />
+                                <label htmlFor="custom-direct">Use Image Directly</label>
+                                <input type="radio" id="custom-desc" name="customImageUse" value="description" checked={customCharacterImageUse === 'description'} onChange={() => setCustomCharacterImageUse('description')} />
+                                <label htmlFor="custom-desc">Use Image Description</label>
+                            </div>
+                        </div>
+                    </>
+                )}
               </>
             )}
-                        {/* NEW: Slider for Scene/Quiz Count */}
             <div className="setting-item scene-count-slider">
               <label htmlFor="sceneCount">Scenes & Quizzes: <strong>{sceneCount}</strong></label>
               <input
