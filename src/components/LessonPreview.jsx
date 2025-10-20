@@ -209,10 +209,10 @@ const LessonPreview = ({ lesson, onClose }) => {
           {!showQuiz ? (
             <div className="scene-content">
               {editingSceneId === currentScene.scene ? (
-                <div className="scene-editor flex flex-col md:flex-row gap-4">
-                  <div className="editor-main-content w-full md:w-1/2">
+                <div className="scene-editor">
+                  <div className="editor-main-content">
                     <div className="edit-field">
-                      <label className="block font-bold mb-1">Paragraph</label>
+                      <label>Paragraph</label>
                       <textarea
                         value={currentScene.paragraph}
                         onChange={(e) =>
@@ -223,13 +223,10 @@ const LessonPreview = ({ lesson, onClose }) => {
                           )
                         }
                         rows={10}
-                        className="w-full p-2 border rounded"
                       />
                     </div>
-                    <div className="edit-field mt-4">
-                      <label className="block font-bold mb-1">
-                        Image Prompt
-                      </label>
+                    <div className="edit-field">
+                      <label>Image Prompt</label>
                       <textarea
                         value={currentScene.image_prompt}
                         onChange={(e) =>
@@ -240,28 +237,24 @@ const LessonPreview = ({ lesson, onClose }) => {
                           )
                         }
                         rows={5}
-                        className="w-full p-2 border rounded"
                       />
                     </div>
                   </div>
-                  <div className="editor-sidebar w-full md:w-1/2 flex flex-col gap-4">
-                    <div className="rewrite-section bg-gray-100 p-4 rounded">
-                      <label className="block font-bold mb-2">
-                        Rewrite Prompt
-                      </label>
+                  <div className="editor-sidebar">
+                    <div className="rewrite-section">
+                      <label>Rewrite Prompt</label>
                       <textarea
                         value={rewritePrompt}
                         onChange={(e) => setRewritePrompt(e.target.value)}
                         placeholder="e.g., Make the scene more dramatic and change the setting to a rainy night."
                         rows={4}
-                        className="w-full p-2 border rounded mb-2"
                       />
                     </div>
-                    <div className="edit-actions flex flex-col gap-2">
+                    <div className="edit-actions">
                       <button
                         onClick={() => handleRewrite(currentScene.scene)}
                         disabled={isRewriting}
-                        className="w-full bg-blue-500 text-white p-2 rounded hover:bg-blue-600 disabled:bg-blue-300"
+                        className="btn-rewrite"
                       >
                         {isRewriting ? "Rewriting..." : "Rewrite Scene"}
                       </button>
@@ -270,21 +263,16 @@ const LessonPreview = ({ lesson, onClose }) => {
                           handleProofreadAndSave(currentScene.scene)
                         }
                         disabled={isProofreading}
-                        className="w-full bg-green-500 text-white p-2 rounded hover:bg-green-600 disabled:bg-green-300"
+                        className="btn-save"
                       >
                         {isProofreading ? "Saving..." : "Save Changes"}
                       </button>
-                      <button
-                        onClick={handleCancelEdit}
-                        className="w-full bg-gray-500 text-white p-2 rounded hover:bg-gray-600"
-                      >
+                      <button onClick={handleCancelEdit} className="btn-cancel">
                         Cancel
                       </button>
                     </div>
                     {feedback && (
-                      <div className="feedback-box mt-4 p-2 bg-yellow-100 border border-yellow-400 text-yellow-700 rounded">
-                        {feedback}
-                      </div>
+                      <div className="editor-feedback-box">{feedback}</div>
                     )}
                   </div>
                 </div>

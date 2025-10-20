@@ -673,7 +673,7 @@ const LessonCreatorPage = () => {
             </div>
           </div>
           {generatedLesson && !isLoading && (
-            <div className="preview-ready" style={{ textAlign: "center" }}>
+            <div className="preview-ready">
               <h4>Your lesson is ready!</h4>
               <p>"{generatedLesson.title}"</p>
               <button
@@ -691,7 +691,7 @@ const LessonCreatorPage = () => {
             The AI will generate your lesson below. When complete, a "Preview"
             button will appear.
           </p>
-          <div className="button-group" style={{ flexDirection: "column" }}>
+          <div className="button-group">
             <button
               className="generate-btn"
               onClick={handleCreateLesson}
