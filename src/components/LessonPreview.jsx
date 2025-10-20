@@ -149,9 +149,8 @@ const LessonPreview = ({ lesson, onClose }) => {
       handleSceneTextChange(sceneId, "paragraph", rewrittenParagraph);
       setFeedback("Scene rewritten. Now rewriting image prompt...");
 
-      const imagePromptRewriteContext = `Based on this new scene, create a new image prompt: "${rewrittenParagraph}"`;
-      const rewrittenImagePrompt = await executeRewrite(scene.image_prompt, {
-        context: imagePromptRewriteContext,
+      const rewrittenImagePrompt = await executeRewrite(rewrittenParagraph, {
+        context: "Rewrite this paragraph into a descriptive image prompt.",
       });
 
       if (rewrittenImagePrompt) {
