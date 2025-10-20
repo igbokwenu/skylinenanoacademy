@@ -16,6 +16,11 @@ const LessonPreview = ({ lesson, onClose }) => {
   const [userAnswers, setUserAnswers] = useState({});
   const [submitted, setSubmitted] = useState(false);
   const [feedback, setFeedback] = useState("");
+  const [selectionRewritePrompt, setSelectionRewritePrompt] = useState("");
+  const [selectedText, setSelectedText] = useState("");
+  const [isRewritePopupVisible, setIsRewritePopupVisible] = useState(false);
+  const [selectionRange, setSelectionRange] = useState(null);
+  const [popupPosition, setPopupPosition] = useState({ top: 0, left: 0 });
 
   const { isLoading: isRewriting, executePrompt: executeRewrite } =
     useLanguageModel({ apiName: "Rewriter" });
@@ -85,6 +90,52 @@ const LessonPreview = ({ lesson, onClose }) => {
         scene.scene === sceneId ? { ...scene, [field]: value } : scene
       ),
     }));
+  };
+
+  const handleSelection = (e, field) => {
+    const textarea = e.target;
+    const start = textarea.selectionStart;
+    const end = textarea.selectionEnd;
+    if (start !== end) {
+      const text = textarea.value.substring(start, end);
+      setSelectedText(text);
+      setSelectionRange({ start, end, field });
+      setIsRewritePopupVisible(true);
+
+      const rect = textarea.getBoundingClientRect();
+      const popupTop = e.clientY - rect.top;
+      const popupLeft = e.clientX - rect.left;
+
+      setPopupPosition({ top: popupTop, left: popupLeft });
+    }
+  };
+
+  const handleRewriteSelection = async () => {
+    if (!selectedText || !selectionRange) return;
+
+    setFeedback("Rewriting selection...");
+    const rewrittenText = await executeRewrite(selectedText, {
+      context: selectionRewritePrompt,
+    });
+
+    if (rewrittenText) {
+      const { start, end, field } = selectionRange;
+      const originalText = currentScene[field];
+      const newText =
+        originalText.substring(0, start) +
+        rewrittenText +
+        originalText.substring(end);
+
+      handleSceneTextChange(currentScene.scene, field, newText);
+      setFeedback("Selection rewritten successfully!");
+    } else {
+      setFeedback("Failed to rewrite the selection.");
+    }
+
+    setIsRewritePopupVisible(false);
+    setSelectionRewritePrompt("");
+    setSelectedText("");
+    setSelectionRange(null);
   };
 
   const handleRewrite = async (sceneId) => {
@@ -215,6 +266,7 @@ const LessonPreview = ({ lesson, onClose }) => {
                       <label>Paragraph</label>
                       <textarea
                         value={currentScene.paragraph}
+                        onSelect={(e) => handleSelection(e, "paragraph")}
                         onChange={(e) =>
                           handleSceneTextChange(
                             currentScene.scene,
@@ -229,6 +281,7 @@ const LessonPreview = ({ lesson, onClose }) => {
                       <label>Image Prompt</label>
                       <textarea
                         value={currentScene.image_prompt}
+                        onSelect={(e) => handleSelection(e, "image_prompt")}
                         onChange={(e) =>
                           handleSceneTextChange(
                             currentScene.scene,
@@ -240,6 +293,32 @@ const LessonPreview = ({ lesson, onClose }) => {
                       />
                     </div>
                   </div>
+                  {isRewritePopupVisible && (
+                    <div
+                      className="rewrite-popup"
+                      style={{
+                        top: popupPosition.top,
+                        left: popupPosition.left,
+                      }}
+                    >
+                      <textarea
+                        value={selectionRewritePrompt}
+                        onChange={(e) =>
+                          setSelectionRewritePrompt(e.target.value)
+                        }
+                        placeholder="e.g., Make this part more playful..."
+                        rows={3}
+                      />
+                      <div className="rewrite-popup-actions">
+                        <button onClick={handleRewriteSelection}>
+                          Rewrite
+                        </button>
+                        <button onClick={() => setIsRewritePopupVisible(false)}>
+                          Close
+                        </button>
+                      </div>
+                    </div>
+                  )}
                   <div className="editor-sidebar">
                     <div className="rewrite-section">
                       <label>Rewrite Prompt</label>
@@ -386,8 +465,10 @@ const LessonPreview = ({ lesson, onClose }) => {
                 </li>
               ))}
             </ul>
-            <button onClick={handleAcceptCorrection}>Accept Changes</button>
-            <button onClick={handleIgnoreCorrection}>Ignore and Save</button>
+            <div class="button-group">
+              <button onClick={handleAcceptCorrection}>Accept Changes</button>
+              <button onClick={handleIgnoreCorrection}>Ignore and Save</button>
+            </div>
           </div>
         )}
       </div>
