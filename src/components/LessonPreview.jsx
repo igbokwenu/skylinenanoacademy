@@ -239,6 +239,52 @@ const LessonPreview = ({ lesson, onClose }) => {
     setFeedback("Corrections ignored. Changes saved.");
   };
 
+  const handleCloseProofreadModal = () => {
+    setProofreadResult(null);
+    // Don't reset editingSceneId, so the user can continue editing.
+  };
+
+  const renderHighlightedText = (text, corrections) => {
+    if (!corrections || corrections.length === 0) {
+      return <p>{text}</p>;
+    }
+
+    const sortedCorrections = [...corrections].sort(
+      (a, b) => a.startIndex - b.startIndex
+    );
+
+    let lastIndex = 0;
+    const highlightedElements = [];
+
+    sortedCorrections.forEach((correction) => {
+      if (correction.startIndex > lastIndex) {
+        highlightedElements.push(
+          <span key={`text-${lastIndex}`}>
+            {text.substring(lastIndex, correction.startIndex)}
+          </span>
+        );
+      }
+      const incorrectText = text.substring(
+        correction.startIndex,
+        correction.endIndex
+      );
+      highlightedElements.push(
+        <span key={`err-${correction.startIndex}`} className="error-highlight">
+          {incorrectText}
+        </span>
+      );
+      lastIndex = correction.endIndex;
+    });
+
+    if (lastIndex < text.length) {
+      highlightedElements.push(
+        <span key="text-end">{text.substring(lastIndex)}</span>
+      );
+    }
+
+    return <p>{highlightedElements}</p>;
+  };
+
   return (
     <div className="lesson-preview-overlay">
       <div className="lesson-preview-modal">
@@ -443,30 +489,42 @@ const LessonPreview = ({ lesson, onClose }) => {
         {proofreadResult && (
           <div className="proofread-modal">
             <h3>Proofreader Suggestions</h3>
-            <p>
-              The following corrections are suggested. Do you want to apply
-              them?
-            </p>
-            <ul>
-              {proofreadResult.corrections.map((c, i) => (
-                <li key={i}>
-                  "
-                  {(
-                    editableLesson.lesson.find(
-                      (s) => s.scene === editingSceneId
-                    ).paragraph +
-                    " " +
-                    editableLesson.lesson.find(
-                      (s) => s.scene === editingSceneId
-                    ).image_prompt
-                  ).substring(c.startIndex, c.endIndex)}
-                  " should be "{c.correction}"
-                </li>
-              ))}
-            </ul>
-            <div class="button-group">
+            <div className="proofread-content">
+              <h4>Original Text with Errors Highlighted</h4>
+              {renderHighlightedText(
+                editableLesson.lesson.find((s) => s.scene === editingSceneId)
+                  .paragraph,
+                proofreadResult.corrections
+              )}
+              {renderHighlightedText(
+                editableLesson.lesson.find((s) => s.scene === editingSceneId)
+                  .image_prompt,
+                proofreadResult.corrections
+              )}
+
+              <h4>Suggested Corrections</h4>
+              <ul>
+                {proofreadResult.corrections.map((c, i) => (
+                  <li key={i}>
+                    "<span className="error-highlight">
+                      {editableLesson.lesson
+                        .find((s) => s.scene === editingSceneId)
+                        .paragraph.substring(c.startIndex, c.endIndex) ||
+                        editableLesson.lesson
+                          .find((s) => s.scene === editingSceneId)
+                          .image_prompt.substring(c.startIndex, c.endIndex)}
+                    </span>"
+                    should be "<strong>{c.correction}</strong>"
+                  </li>
+                ))}
+              </ul>
+            </div>
+            <div className="proofread-actions">
               <button onClick={handleAcceptCorrection}>Accept Changes</button>
               <button onClick={handleIgnoreCorrection}>Ignore and Save</button>
+              <button onClick={handleCloseProofreadModal} className="btn-cancel">
+                Close
+              </button>
             </div>
           </div>
         )}

@@ -721,3 +721,42 @@ button:hover {
   justify-content: flex-end;
   gap: 0.5rem;
 }
+
+/* --- STYLES FOR PROOFREAD MODAL --- */
+.proofread-modal {
+  width: 90%;
+  max-width: 800px;
+}
+
+.proofread-content h4 {
+  margin-top: 1rem;
+  margin-bottom: 0.5rem;
+  border-bottom: 1px solid #eee;
+  padding-bottom: 0.5rem;
+}
+
+.proofread-content p {
+  background-color: #f9f9f9;
+  border: 1px solid #eee;
+  padding: 1rem;
+  border-radius: 6px;
+  line-height: 1.6;
+}
+
+.proofread-content ul {
+  list-style-type: none;
+  padding: 0;
+}
+
+.proofread-content li {
+  margin-bottom: 0.5rem;
+}
+
+.proofread-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 1rem;
+  margin-top: 1.5rem;
+  padding-top: 1rem;
+  border-top: 1px solid #eee;
+}
