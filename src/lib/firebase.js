@@ -18,9 +18,11 @@ const firebaseApp = initializeApp(firebaseConfig);
 // Initialize the Google AI service
 const ai = getAI(firebaseApp, { backend: new GoogleAIBackend() });
 
-// Create a `GenerativeModel` instance
-export const model = getGenerativeModel(ai, {
-  mode: 'prefer_on_device',
+const onDeviceModel = getGenerativeModel(ai, {
+  model: 'gemini-2.5-flash',
+  mode: 'on_device',
+});
+const cloudModel = getGenerativeModel(ai, {
   model: 'gemini-2.5-flash',
 });
 
@@ -28,6 +30,13 @@ export const model = getGenerativeModel(ai, {
 export const imageModel = getGenerativeModel(ai, {
   model: 'gemini-2.5-flash-image',
 });
+
+export const getModel = async () => {
+  if ('LanguageModel' in self && (await self.LanguageModel.availability()) === 'available') {
+    return onDeviceModel;
+  }
+  return cloudModel;
+};
 
 export const getSource = async () =>
   'LanguageModel' in self &&

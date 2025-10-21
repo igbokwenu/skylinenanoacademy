@@ -1,6 +1,11 @@
 //src/components/FirebaseAi.jsx
 import React, { useState, useEffect, useRef } from "react";
-import { model, imageModel, getSource, fileToGenerativePart } from "../lib/firebase";
+import {
+  getModel,
+  imageModel,
+  getSource,
+  fileToGenerativePart,
+} from "../lib/firebase";
 
 function FirebaseAi() {
   const [onDeviceStatus, setOnDeviceStatus] = useState("checking...");
@@ -32,14 +37,17 @@ function FirebaseAi() {
     abortControllerRef.current = new AbortController();
     setIsStreaming(true);
     try {
-      const result = await model.generateContentStream(prompt, { signal: abortControllerRef.current.signal });
+      const model = await getModel();
+      const result = await model.generateContentStream(prompt, {
+        signal: abortControllerRef.current.signal,
+      });
       for await (const chunk of result.stream) {
         const chunkText = chunk.text();
         setJokeResponse((prev) => prev + chunkText);
       }
     } catch (err) {
-      if (err.name === 'AbortError') {
-        setJokeResponse('Joke generation stopped.');
+      if (err.name === "AbortError") {
+        setJokeResponse("Joke generation stopped.");
       } else {
         console.error(err.name, err.message);
         setJokeResponse(`Error: ${err.message}`);
@@ -66,14 +74,17 @@ function FirebaseAi() {
     abortControllerRef.current = new AbortController();
     setIsStreaming(true);
     try {
-      const result = await model.generateContentStream([prompt, imagePart], { signal: abortControllerRef.current.signal });
+      const model = await getModel();
+      const result = await model.generateContentStream([prompt, imagePart], {
+        signal: abortControllerRef.current.signal,
+      });
       for await (const chunk of result.stream) {
         const chunkText = chunk.text();
         setPoemResponse((prev) => prev + chunkText);
       }
     } catch (err) {
-      if (err.name === 'AbortError') {
-        setPoemResponse('Poem generation stopped.');
+      if (err.name === "AbortError") {
+        setPoemResponse("Poem generation stopped.");
       } else {
         console.error(err.name, err.message);
         setPoemResponse(`Error: ${err.message}`);
