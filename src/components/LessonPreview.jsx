@@ -168,14 +168,19 @@ const LessonPreview = ({ lesson, onClose }) => {
     setIsProofreading(true);
     setFeedback("Proofreading...");
     const scene = editableLesson.lesson.find((s) => s.scene === sceneId);
-    const textToProofread = `${scene.paragraph}\n\n${scene.image_prompt}`;
 
     try {
       const proofreader = await self.Proofreader.create();
-      const result = await proofreader.proofread(textToProofread);
-      console.log("Proofread result:", result);
-      if (result.corrections && result.corrections.length > 0) {
-        setProofreadResult(result);
+      const paragraphResult = await proofreader.proofread(scene.paragraph);
+      const imagePromptResult = await proofreader.proofread(scene.image_prompt);
+
+      if (
+        (paragraphResult.corrections &&
+          paragraphResult.corrections.length > 0) ||
+        (imagePromptResult.corrections &&
+          imagePromptResult.corrections.length > 0)
+      ) {
+        setProofreadResult({ paragraphResult, imagePromptResult });
         setFeedback("Proofreading complete. Please review the suggestions.");
       } else {
         setEditingSceneId(null);
@@ -191,20 +196,10 @@ const LessonPreview = ({ lesson, onClose }) => {
   };
 
   const handleAcceptCorrection = () => {
-    const correctedText = proofreadResult.correction;
+    const { paragraphResult, imagePromptResult } = proofreadResult;
 
-    const paragraphBreak = correctedText.indexOf("\n\n");
-
-    let newParagraph;
-    let newImagePrompt;
-
-    if (paragraphBreak !== -1) {
-      newParagraph = correctedText.substring(0, paragraphBreak);
-      newImagePrompt = correctedText.substring(paragraphBreak + 2);
-    } else {
-      newParagraph = correctedText;
-      newImagePrompt = "";
-    }
+    const newParagraph = paragraphResult.correctedInput;
+    const newImagePrompt = imagePromptResult.correctedInput;
 
     setEditableLesson((prev) => ({
       ...prev,
@@ -480,36 +475,56 @@ const LessonPreview = ({ lesson, onClose }) => {
           <div className="proofread-modal">
             <h3>Proofreader Suggestions</h3>
             <div className="proofread-content">
-              <h4>Original Text with Errors Highlighted</h4>
-              {renderHighlightedText(
-                `${
-                  editableLesson.lesson.find((s) => s.scene === editingSceneId)
-                    .paragraph
-                }\n\n${editableLesson.lesson.find((s) => s.scene === editingSceneId)
-                  .image_prompt}`,
-                proofreadResult.corrections
-              )}
-
-              <h4>Suggested Corrections</h4>
-              <ul>
-                {proofreadResult.corrections.map((c, i) => {
-                  const originalText = `${
+              {proofreadResult.paragraphResult.corrections.length > 0 && (
+                <>
+                  <h4>Paragraph</h4>
+                  {renderHighlightedText(
                     editableLesson.lesson.find(
                       (s) => s.scene === editingSceneId
-                    ).paragraph
-                  }\n\n${editableLesson.lesson.find(
-                    (s) => s.scene === editingSceneId
-                  ).image_prompt}`;
-                  return (
-                    <li key={i}>
-                      "<span className="error-highlight">
-                        {originalText.substring(c.startIndex, c.endIndex)}
-                      </span>"
-                      should be "<strong>{c.correction}</strong>"
-                    </li>
-                  );
-                })}
-              </ul>
+                    ).paragraph,
+                    proofreadResult.paragraphResult.corrections
+                  )}
+                  <h5>Suggestions:</h5>
+                  <ul>
+                    {proofreadResult.paragraphResult.corrections.map((c, i) => (
+                      <li key={`p-${i}`}>
+                        "<span className="error-highlight">
+                          {editableLesson.lesson
+                            .find((s) => s.scene === editingSceneId)
+                            .paragraph.substring(c.startIndex, c.endIndex)}
+                        </span>"
+                        should be "<strong>{c.correction}</strong>"
+                      </li>
+                    ))}
+                  </ul>
+                </>
+              )}
+              {proofreadResult.imagePromptResult.corrections.length > 0 && (
+                <>
+                  <h4>Image Prompt</h4>
+                  {renderHighlightedText(
+                    editableLesson.lesson.find(
+                      (s) => s.scene === editingSceneId
+                    ).image_prompt,
+                    proofreadResult.imagePromptResult.corrections
+                  )}
+                  <h5>Suggestions:</h5>
+                  <ul>
+                    {proofreadResult.imagePromptResult.corrections.map(
+                      (c, i) => (
+                        <li key={`ip-${i}`}>
+                          "<span className="error-highlight">
+                            {editableLesson.lesson
+                              .find((s) => s.scene === editingSceneId)
+                              .image_prompt.substring(c.startIndex, c.endIndex)}
+                          </span>"
+                          should be "<strong>{c.correction}</strong>"
+                        </li>
+                      )
+                    )}
+                  </ul>
+                </>
+              )}
             </div>
             <div className="proofread-actions">
               <button onClick={handleAcceptCorrection}>Accept Changes</button>
