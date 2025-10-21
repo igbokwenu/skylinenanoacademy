@@ -132,7 +132,10 @@ const LessonCreatorPage = () => {
     executePrompt,
     abortCurrentPrompt,
     tokenInfo,
-  } = useLanguageModel({ apiName: "LanguageModel" });
+  } = useLanguageModel({
+    apiName: "LanguageModel",
+    creationOptions: { expectedInputs: [{ type: "image" }, { type: "text" }] },
+  });
 
   const {
     isLoading: isAnalysisLoading,
