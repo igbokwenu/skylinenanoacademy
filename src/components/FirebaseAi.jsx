@@ -98,22 +98,51 @@ function FirebaseAi() {
   const handleImageGeneration = async () => {
     if (!imagePrompt) {
       alert("Please enter a prompt for image generation.");
+
       return;
     }
+
     setGeneratedImage("");
+
     setImageSource("Cloud AI");
+
     try {
       const result = await imageModel.generateContent(imagePrompt);
+
       const response = await result.response;
+
+      console.log("Image generation response:", response);
+
       const candidates = response.candidates;
+
       if (candidates && candidates.length > 0) {
-        const part = candidates[0].content.parts[0];
-        if (part.inlineData) {
-          setGeneratedImage(part.inlineData.data);
+        const imagePart = candidates[0].content.parts.find(
+          (part) => part.inlineData
+        );
+
+        if (imagePart) {
+          setGeneratedImage(imagePart.inlineData.data);
+        } else {
+          setGeneratedImage(
+            `Error: No image generated. Full response: ${JSON.stringify(
+              response,
+              null,
+              2
+            )}`
+          );
         }
+      } else {
+        setGeneratedImage(
+          `Error: No image generated. Full response: ${JSON.stringify(
+            response,
+            null,
+            2
+          )}`
+        );
       }
     } catch (err) {
       console.error(err.name, err.message);
+
       setGeneratedImage(`Error: ${err.message}`);
     }
   };
@@ -185,11 +214,17 @@ function FirebaseAi() {
         </small>
         {generatedImage && (
           <div>
-            <img
-              src={`data:image/png;base64,${generatedImage}`}
-              alt="Generated"
-            />
-            <button onClick={handleImageDownload}>Download Image</button>
+            {generatedImage.startsWith("Error:") ? (
+              <pre style={{ whiteSpace: "pre-wrap" }}>{generatedImage}</pre>
+            ) : (
+              <>
+                <img
+                  src={`data:image/png;base64,${generatedImage}`}
+                  alt="Generated"
+                />
+                <button onClick={handleImageDownload}>Download Image</button>
+              </>
+            )}
           </div>
         )}
       </div>
