@@ -313,6 +313,15 @@ const LessonCreatorPage = () => {
     setIsGeneratingImages(true);
     setGenerationError(null);
 
+    let characterDescription = "";
+    if (settings.perspective.includes("Immersive")) {
+      if (characterMode === "student" && studentImageAnalysis.facialFeatures) {
+        characterDescription = `The character has the following features: ${studentImageAnalysis.facialFeatures}.`;
+      } else if (characterMode === "custom" && customCharacterDescription) {
+        characterDescription = `The character is described as: ${customCharacterDescription}.`;
+      }
+    }
+
     const characterConsistencyPrompt = `
       Maintain character consistency across all images.
       The main character is ${
@@ -320,22 +329,14 @@ const LessonCreatorPage = () => {
           ? `a student named ${settings.studentName || "the student"}`
           : "a custom character"
       }.
-      ${
-        characterMode === "student"
-          ? `Gender: ${
-              studentImageAnalysis.gender || settings.studentGender
-            }, Ethnicity: ${
-              studentImageAnalysis.ethnicity || settings.studentEthnicity
-            }, Facial Features: ${studentImageAnalysis.facialFeatures}`
-          : `Description: ${customCharacterDescription}`
-      }
+      ${characterDescription}
       Ensure the character's appearance, including clothing and hairstyle, is consistent in every scene unless the story dictates a change.
     `;
 
     try {
       const imagePromises = generatedLesson.lesson.map(async (scene) => {
         const fullPrompt = `
-          ${scene.image_prompt}
+          ${characterDescription} ${scene.image_prompt}
           ---
           ${characterConsistencyPrompt}
           Visual Style: ${settings.style}.
@@ -397,7 +398,7 @@ const LessonCreatorPage = () => {
           {
             type: "text",
             value:
-              'Analyze the person in this image and provide their gender ( Select from exactly: Male, Female, Other), ethnicity, and a detailed description of their facial features suitable for creating an animated character. Focus on key characteristics like eye shape and color, nose shape, mouth shape, jawline, and any distinctive features like freckles, scars, or glasses. For the ethnicity, you must choose from one of the following options: "American Indian or Alaska Native", "Asian", "Black or African American", "White", "Hispanic or Latino", "Middle Eastern or North African (MENA)", "Native Hawaiian or Pacific Islander". Respond in JSON format with the keys: "gender", "ethnicity", "facialFeatures".',
+              'Analyze the person in this image and provide their gender ( Select from exactly: Male, Female, Other), ethnicity, and a detailed description of their facial features suitable for creating an animated character. Focus on key characteristics like eye shape and color, nose shape, mouth shape, jawline, and any distinctive features like freckles, scars, or glasses. The description should be detailed enough to be used for character consistency in image generation. For the ethnicity, you must choose from one of the following options: "American Indian or Alaska Native", "Asian", "Black or African American", "White", "Hispanic or Latino", "Middle Eastern or North African (MENA)", "Native Hawaiian or Pacific Islander". Respond in JSON format with the keys: "gender", "ethnicity", "facialFeatures".',
           },
         ],
       },
