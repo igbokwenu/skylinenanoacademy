@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from "react";
-import { model, getSource, fileToGenerativePart } from "../lib/firebase";
+import React, { useState, useEffect, useRef } from "react";
+import { model, imageModel, getSource, fileToGenerativePart } from "../lib/firebase";
 
 function FirebaseAi() {
   const [onDeviceStatus, setOnDeviceStatus] = useState("checking...");
@@ -8,6 +8,11 @@ function FirebaseAi() {
   const [poemResponse, setPoemResponse] = useState("");
   const [poemSource, setPoemSource] = useState("N/A");
   const [file, setFile] = useState(null);
+  const [imagePrompt, setImagePrompt] = useState("");
+  const [generatedImage, setGeneratedImage] = useState("");
+  const [imageSource, setImageSource] = useState("N/A");
+  const [isStreaming, setIsStreaming] = useState(false);
+  const abortControllerRef = useRef(null);
 
   useEffect(() => {
     async function checkOnDeviceStatus() {
@@ -23,15 +28,24 @@ function FirebaseAi() {
     setJokeResponse("");
     setJokeSource(await getSource());
     const prompt = "Tell me a long joke";
+    abortControllerRef.current = new AbortController();
+    setIsStreaming(true);
     try {
-      const result = await model.generateContentStream(prompt);
+      const result = await model.generateContentStream(prompt, { signal: abortControllerRef.current.signal });
       for await (const chunk of result.stream) {
         const chunkText = chunk.text();
         setJokeResponse((prev) => prev + chunkText);
       }
     } catch (err) {
-      console.error(err.name, err.message);
-      setJokeResponse(`Error: ${err.message}`);
+      if (err.name === 'AbortError') {
+        setJokeResponse('Joke generation stopped.');
+      } else {
+        console.error(err.name, err.message);
+        setJokeResponse(`Error: ${err.message}`);
+      }
+    } finally {
+      setIsStreaming(false);
+      abortControllerRef.current = null;
     }
   };
 
@@ -48,15 +62,62 @@ function FirebaseAi() {
     setPoemSource(await getSource());
     const prompt = "Write a poem on this picture";
     const imagePart = await fileToGenerativePart(file);
+    abortControllerRef.current = new AbortController();
+    setIsStreaming(true);
     try {
-      const result = await model.generateContentStream([prompt, imagePart]);
+      const result = await model.generateContentStream([prompt, imagePart], { signal: abortControllerRef.current.signal });
       for await (const chunk of result.stream) {
         const chunkText = chunk.text();
         setPoemResponse((prev) => prev + chunkText);
       }
     } catch (err) {
+      if (err.name === 'AbortError') {
+        setPoemResponse('Poem generation stopped.');
+      } else {
+        console.error(err.name, err.message);
+        setPoemResponse(`Error: ${err.message}`);
+      }
+    } finally {
+      setIsStreaming(false);
+      abortControllerRef.current = null;
+    }
+  };
+
+  const handleImageGeneration = async () => {
+    if (!imagePrompt) {
+      alert("Please enter a prompt for image generation.");
+      return;
+    }
+    setGeneratedImage("");
+    setImageSource("Cloud AI");
+    try {
+      const result = await imageModel.generateContent(imagePrompt);
+      const response = await result.response;
+      const candidates = response.candidates;
+      if (candidates && candidates.length > 0) {
+        const part = candidates[0].content.parts[0];
+        if (part.inlineData) {
+          setGeneratedImage(part.inlineData.data);
+        }
+      }
+    } catch (err) {
       console.error(err.name, err.message);
-      setPoemResponse(`Error: ${err.message}`);
+      setGeneratedImage(`Error: ${err.message}`);
+    }
+  };
+
+  const handleImageDownload = () => {
+    const link = document.createElement("a");
+    link.href = `data:image/png;base64,${generatedImage}`;
+    link.download = "generated_image.png";
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  const handleStop = () => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
     }
   };
 
@@ -67,26 +128,58 @@ function FirebaseAi() {
 
       <h2>Textual prompt</h2>
       <div>
-        <button onClick={handleJokeClick}>Tell me a joke</button>
+        <button onClick={handleJokeClick} disabled={isStreaming}>
+          Tell me a joke
+        </button>
+        <button onClick={handleStop} disabled={!isStreaming}>
+          Stop
+        </button>
         <br />
         <small>
           Response from: <span>{jokeSource}</span>
         </small>
-        <pre>{jokeResponse}</pre>
+        <pre style={{ whiteSpace: "pre-wrap" }}>{jokeResponse}</pre>
       </div>
 
       <h2>Multimodal prompt</h2>
       <div>
         <p>Write a poem on this picture:</p>
         <input type="file" onChange={handleFileChange} accept="image/*" />
-        <button onClick={handlePoemClick} disabled={!file}>
+        <button onClick={handlePoemClick} disabled={!file || isStreaming}>
           Generate Poem
+        </button>
+        <button onClick={handleStop} disabled={!isStreaming}>
+          Stop
         </button>
         <br />
         <small>
           Response from: <span>{poemSource}</span>
         </small>
-        <pre>{poemResponse}</pre>
+        <pre style={{ whiteSpace: "pre-wrap" }}>{poemResponse}</pre>
+      </div>
+
+      <h2>Image Generation</h2>
+      <div>
+        <input
+          type="text"
+          value={imagePrompt}
+          onChange={(e) => setImagePrompt(e.target.value)}
+          placeholder="Enter a prompt for image generation"
+        />
+        <button onClick={handleImageGeneration}>Generate Image</button>
+        <br />
+        <small>
+          Response from: <span>{imageSource}</span>
+        </small>
+        {generatedImage && (
+          <div>
+            <img
+              src={`data:image/png;base64,${generatedImage}`}
+              alt="Generated"
+            />
+            <button onClick={handleImageDownload}>Download Image</button>
+          </div>
+        )}
       </div>
     </div>
   );
