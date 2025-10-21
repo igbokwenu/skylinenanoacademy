@@ -24,6 +24,11 @@ export const model = getGenerativeModel(ai, {
   model: 'gemini-2.5-flash',
 });
 
+// Create a `GenerativeModel` instance for image generation
+export const imageModel = getGenerativeModel(ai, {
+  model: 'gemini-2.5-flash-image',
+});
+
 export const getSource = async () =>
   'LanguageModel' in self &&
   (await self.LanguageModel.availability()) === 'available'
