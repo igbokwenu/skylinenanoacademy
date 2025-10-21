@@ -389,7 +389,7 @@ const LessonPreview = ({ lesson, onClose }) => {
                 <>
                   <div className="image-container">
                     <img
-                      src={placeholderImage}
+                      src={currentScene.imageData ? `data:image/png;base64,${currentScene.imageData}` : placeholderImage}
                       alt={`Scene ${currentScene.scene}`}
                     />
                     <p className="image-prompt-caption">

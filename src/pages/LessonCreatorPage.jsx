@@ -5,6 +5,7 @@ import { useLanguageModel } from "../hooks/useLanguageModel";
 import { useMonitorDownload } from "../hooks/useMonitorDownload";
 import LessonPreview from "../components/LessonPreview";
 import lessonCreatorIcon from "../assets/skyline_nano_academy.png";
+import { imageModel } from "../lib/firebase";
 
 // --- Configuration (Unchanged) ---
 const lessonParams = {
@@ -104,6 +105,8 @@ const LessonCreatorPage = () => {
   });
   const [sceneCount, setSceneCount] = useState(5);
   const [generatedLesson, setGeneratedLesson] = useState(null);
+  const [lessonWithImages, setLessonWithImages] = useState(null);
+  const [isGeneratingImages, setIsGeneratingImages] = useState(false);
   const [isPreviewVisible, setIsPreviewVisible] = useState(false);
   const [generationError, setGenerationError] = useState(null);
   const [isStreamVisible, setIsStreamVisible] = useState(false);
@@ -305,6 +308,77 @@ const LessonCreatorPage = () => {
     }
   };
 
+  const handleGenerateImages = async () => {
+    if (!generatedLesson) return;
+    setIsGeneratingImages(true);
+    setGenerationError(null);
+
+    const characterConsistencyPrompt = `
+      Maintain character consistency across all images.
+      The main character is ${
+        characterMode === "student"
+          ? `a student named ${settings.studentName || "the student"}`
+          : "a custom character"
+      }.
+      ${
+        characterMode === "student"
+          ? `Gender: ${
+              studentImageAnalysis.gender || settings.studentGender
+            }, Ethnicity: ${
+              studentImageAnalysis.ethnicity || settings.studentEthnicity
+            }, Facial Features: ${studentImageAnalysis.facialFeatures}`
+          : `Description: ${customCharacterDescription}`
+      }
+      Ensure the character's appearance, including clothing and hairstyle, is consistent in every scene unless the story dictates a change.
+    `;
+
+    try {
+      const imagePromises = generatedLesson.lesson.map(async (scene) => {
+        const fullPrompt = `
+          ${scene.image_prompt}
+          ---
+          ${characterConsistencyPrompt}
+          Visual Style: ${settings.style}.
+        `;
+
+        try {
+          const result = await imageModel.generateContent(fullPrompt);
+          const response = await result.response;
+          const candidates = response.candidates;
+          if (candidates && candidates.length > 0) {
+            const imagePart = candidates[0].content.parts.find(
+              (part) => part.inlineData
+            );
+            if (imagePart) {
+              return { ...scene, imageData: imagePart.inlineData.data };
+            }
+          }
+          return { ...scene, imageData: null }; // Return scene even if image fails
+        } catch (error) {
+          console.error(
+            `Image generation failed for scene ${scene.scene}:`,
+            error
+          );
+          return { ...scene, imageData: null }; // Keep scene on individual failure
+        }
+      });
+
+      const scenesWithImages = await Promise.all(imagePromises);
+
+      setLessonWithImages({
+        ...generatedLesson,
+        lesson: scenesWithImages,
+      });
+    } catch (error) {
+      console.error("Batch image generation failed:", error);
+      setGenerationError(
+        "An error occurred during image generation. Please try again."
+      );
+    } finally {
+      setIsGeneratingImages(false);
+    }
+  };
+
   const handleSettingChange = (e) => {
     const { name, value } = e.target;
     setSettings((prev) => ({ ...prev, [name]: value }));
@@ -382,9 +456,9 @@ const LessonCreatorPage = () => {
 
   return (
     <div className="lesson-creator-container">
-      {isPreviewVisible && generatedLesson && (
+      {isPreviewVisible && (generatedLesson || lessonWithImages) && (
         <LessonPreview
-          lesson={generatedLesson}
+          lesson={lessonWithImages || generatedLesson}
           onClose={() => setIsPreviewVisible(false)}
         />
       )}
@@ -682,6 +756,15 @@ const LessonCreatorPage = () => {
               >
                 Preview Lesson
               </button>
+              <button
+                className="generate-img-btn"
+                onClick={handleGenerateImages}
+                disabled={isGeneratingImages}
+              >
+                {isGeneratingImages
+                  ? "Generating Images..."
+                  : "Add Images to Lesson"}
+              </button>
             </div>
           )}
         </div>
@@ -737,6 +820,15 @@ const LessonCreatorPage = () => {
                 onClick={() => setIsPreviewVisible(true)}
               >
                 Preview Lesson
+              </button>
+              <button
+                className="generate-img-btn"
+                onClick={handleGenerateImages}
+                disabled={isGeneratingImages}
+              >
+                {isGeneratingImages
+                  ? "Generating Images..."
+                  : "Add Images to Lesson"}
               </button>
             </div>
           )}
