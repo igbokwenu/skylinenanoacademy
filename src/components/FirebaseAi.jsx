@@ -1,26 +1,28 @@
-import React, { useState, useEffect } from 'react';
-import { model, getSource, fileToGenerativePart } from '../lib/firebase';
+import React, { useState, useEffect } from "react";
+import { model, getSource, fileToGenerativePart } from "../lib/firebase";
 
 function FirebaseAi() {
-  const [onDeviceStatus, setOnDeviceStatus] = useState('checking...');
-  const [jokeResponse, setJokeResponse] = useState('');
-  const [jokeSource, setJokeSource] = useState('N/A');
-  const [poemResponse, setPoemResponse] = useState('');
-  const [poemSource, setPoemSource] = useState('N/A');
+  const [onDeviceStatus, setOnDeviceStatus] = useState("checking...");
+  const [jokeResponse, setJokeResponse] = useState("");
+  const [jokeSource, setJokeSource] = useState("N/A");
+  const [poemResponse, setPoemResponse] = useState("");
+  const [poemSource, setPoemSource] = useState("N/A");
   const [file, setFile] = useState(null);
 
   useEffect(() => {
     async function checkOnDeviceStatus() {
       const source = await getSource();
-      setOnDeviceStatus(source === 'Built-in AI' ? 'available' : 'not available');
+      setOnDeviceStatus(
+        source === "Built-in AI" ? "available" : "not available"
+      );
     }
     checkOnDeviceStatus();
   }, []);
 
   const handleJokeClick = async () => {
-    setJokeResponse('');
+    setJokeResponse("");
     setJokeSource(await getSource());
-    const prompt = 'Tell me a short joke';
+    const prompt = "Tell me a long joke";
     try {
       const result = await model.generateContentStream(prompt);
       for await (const chunk of result.stream) {
@@ -39,12 +41,12 @@ function FirebaseAi() {
 
   const handlePoemClick = async () => {
     if (!file) {
-      alert('Please select a file first.');
+      alert("Please select a file first.");
       return;
     }
-    setPoemResponse('');
+    setPoemResponse("");
     setPoemSource(await getSource());
-    const prompt = 'Write a poem on this picture';
+    const prompt = "Write a poem on this picture";
     const imagePart = await fileToGenerativePart(file);
     try {
       const result = await model.generateContentStream([prompt, imagePart]);
@@ -62,12 +64,14 @@ function FirebaseAi() {
     <div>
       <h1>Firebase AI Logic</h1>
       <p>On-device AI status: {onDeviceStatus}</p>
-      
+
       <h2>Textual prompt</h2>
       <div>
         <button onClick={handleJokeClick}>Tell me a joke</button>
         <br />
-        <small>Response from: <span>{jokeSource}</span></small>
+        <small>
+          Response from: <span>{jokeSource}</span>
+        </small>
         <pre>{jokeResponse}</pre>
       </div>
 
@@ -75,9 +79,13 @@ function FirebaseAi() {
       <div>
         <p>Write a poem on this picture:</p>
         <input type="file" onChange={handleFileChange} accept="image/*" />
-        <button onClick={handlePoemClick} disabled={!file}>Generate Poem</button>
+        <button onClick={handlePoemClick} disabled={!file}>
+          Generate Poem
+        </button>
         <br />
-        <small>Response from: <span>{poemSource}</span></small>
+        <small>
+          Response from: <span>{poemSource}</span>
+        </small>
         <pre>{poemResponse}</pre>
       </div>
     </div>
