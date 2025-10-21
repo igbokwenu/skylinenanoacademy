@@ -173,6 +173,7 @@ const LessonPreview = ({ lesson, onClose }) => {
     try {
       const proofreader = await self.Proofreader.create();
       const result = await proofreader.proofread(textToProofread);
+      console.log("Proofread result:", result);
       if (result.corrections && result.corrections.length > 0) {
         setProofreadResult(result);
         setFeedback("Proofreading complete. Please review the suggestions.");
@@ -190,31 +191,20 @@ const LessonPreview = ({ lesson, onClose }) => {
   };
 
   const handleAcceptCorrection = () => {
-    let correctedParagraph = editableLesson.lesson.find(
-      (s) => s.scene === editingSceneId
-    ).paragraph;
-    let correctedImagePrompt = editableLesson.lesson.find(
-      (s) => s.scene === editingSceneId
-    ).image_prompt;
+    const correctedText = proofreadResult.correction;
 
-    const corrections = proofreadResult.corrections;
+    const paragraphBreak = correctedText.indexOf("\n\n");
 
-    corrections.forEach((correction) => {
-      correctedParagraph = correctedParagraph.replace(
-        correctedParagraph.substring(
-          correction.startIndex,
-          correction.endIndex
-        ),
-        correction.correction
-      );
-      correctedImagePrompt = correctedImagePrompt.replace(
-        correctedImagePrompt.substring(
-          correction.startIndex,
-          correction.endIndex
-        ),
-        correction.correction
-      );
-    });
+    let newParagraph;
+    let newImagePrompt;
+
+    if (paragraphBreak !== -1) {
+      newParagraph = correctedText.substring(0, paragraphBreak);
+      newImagePrompt = correctedText.substring(paragraphBreak + 2);
+    } else {
+      newParagraph = correctedText;
+      newImagePrompt = "";
+    }
 
     setEditableLesson((prev) => ({
       ...prev,
@@ -222,8 +212,8 @@ const LessonPreview = ({ lesson, onClose }) => {
         scene.scene === editingSceneId
           ? {
               ...scene,
-              paragraph: correctedParagraph,
-              image_prompt: correctedImagePrompt,
+              paragraph: newParagraph,
+              image_prompt: newImagePrompt,
             }
           : scene
       ),
@@ -492,31 +482,33 @@ const LessonPreview = ({ lesson, onClose }) => {
             <div className="proofread-content">
               <h4>Original Text with Errors Highlighted</h4>
               {renderHighlightedText(
-                editableLesson.lesson.find((s) => s.scene === editingSceneId)
-                  .paragraph,
-                proofreadResult.corrections
-              )}
-              {renderHighlightedText(
-                editableLesson.lesson.find((s) => s.scene === editingSceneId)
-                  .image_prompt,
+                `${
+                  editableLesson.lesson.find((s) => s.scene === editingSceneId)
+                    .paragraph
+                }\n\n${editableLesson.lesson.find((s) => s.scene === editingSceneId)
+                  .image_prompt}`,
                 proofreadResult.corrections
               )}
 
               <h4>Suggested Corrections</h4>
               <ul>
-                {proofreadResult.corrections.map((c, i) => (
-                  <li key={i}>
-                    "<span className="error-highlight">
-                      {editableLesson.lesson
-                        .find((s) => s.scene === editingSceneId)
-                        .paragraph.substring(c.startIndex, c.endIndex) ||
-                        editableLesson.lesson
-                          .find((s) => s.scene === editingSceneId)
-                          .image_prompt.substring(c.startIndex, c.endIndex)}
-                    </span>"
-                    should be "<strong>{c.correction}</strong>"
-                  </li>
-                ))}
+                {proofreadResult.corrections.map((c, i) => {
+                  const originalText = `${
+                    editableLesson.lesson.find(
+                      (s) => s.scene === editingSceneId
+                    ).paragraph
+                  }\n\n${editableLesson.lesson.find(
+                    (s) => s.scene === editingSceneId
+                  ).image_prompt}`;
+                  return (
+                    <li key={i}>
+                      "<span className="error-highlight">
+                        {originalText.substring(c.startIndex, c.endIndex)}
+                      </span>"
+                      should be "<strong>{c.correction}</strong>"
+                    </li>
+                  );
+                })}
               </ul>
             </div>
             <div className="proofread-actions">
