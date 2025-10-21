@@ -1,3 +1,4 @@
+//src/components/FirebaseAi.jsx
 import React, { useState, useEffect, useRef } from "react";
 import { model, imageModel, getSource, fileToGenerativePart } from "../lib/firebase";
 
