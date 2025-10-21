@@ -488,12 +488,13 @@ const LessonPreview = ({ lesson, onClose }) => {
                   <ul>
                     {proofreadResult.paragraphResult.corrections.map((c, i) => (
                       <li key={`p-${i}`}>
-                        "<span className="error-highlight">
+                        "
+                        <span className="error-highlight">
                           {editableLesson.lesson
                             .find((s) => s.scene === editingSceneId)
                             .paragraph.substring(c.startIndex, c.endIndex)}
-                        </span>"
-                        should be "<strong>{c.correction}</strong>"
+                        </span>
+                        " should be "<strong>{c.correction}</strong>"
                       </li>
                     ))}
                   </ul>
@@ -513,12 +514,13 @@ const LessonPreview = ({ lesson, onClose }) => {
                     {proofreadResult.imagePromptResult.corrections.map(
                       (c, i) => (
                         <li key={`ip-${i}`}>
-                          "<span className="error-highlight">
+                          "
+                          <span className="error-highlight">
                             {editableLesson.lesson
                               .find((s) => s.scene === editingSceneId)
                               .image_prompt.substring(c.startIndex, c.endIndex)}
-                          </span>"
-                          should be "<strong>{c.correction}</strong>"
+                          </span>
+                          " should be "<strong>{c.correction}</strong>"
                         </li>
                       )
                     )}
@@ -529,7 +531,10 @@ const LessonPreview = ({ lesson, onClose }) => {
             <div className="proofread-actions">
               <button onClick={handleAcceptCorrection}>Accept Changes</button>
               <button onClick={handleIgnoreCorrection}>Ignore and Save</button>
-              <button onClick={handleCloseProofreadModal} className="btn-cancel">
+              <button
+                onClick={handleCloseProofreadModal}
+                className="btn-cancel"
+              >
                 Close
               </button>
             </div>
