@@ -1,0 +1,130 @@
+/* src/pages/BrowseLessonsPage.css */
+
+.browse-lessons-container {
+  padding: 20px;
+}
+
+.bl-header {
+  text-align: center;
+  margin-bottom: 30px;
+}
+
+.bl-header h1 {
+  margin-bottom: 5px;
+}
+
+.bl-header p {
+  color: #666;
+  font-size: 1.1em;
+}
+
+.bl-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 20px;
+  justify-content: center;
+  margin-bottom: 30px;
+  padding: 20px;
+  background-color: #f9f9f9;
+  border-radius: 8px;
+}
+
+.filter-item {
+  display: flex;
+  flex-direction: column;
+}
+
+.filter-item label {
+  font-weight: 500;
+  margin-bottom: 5px;
+  font-size: 0.9em;
+}
+
+.filter-item select {
+  padding: 10px;
+  border-radius: 6px;
+  border: 1px solid #ccc;
+  min-width: 180px;
+}
+
+.bl-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 25px;
+}
+
+.lesson-card {
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.lesson-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.15);
+}
+
+.lesson-card-image {
+  width: 100%;
+  height: 200px;
+  object-fit: cover;
+}
+
+.lesson-card-content {
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  flex-grow: 1;
+}
+
+.lesson-card-content h3 {
+  margin-top: 0;
+  margin-bottom: 10px;
+}
+
+.lesson-card-blurb {
+  font-size: 0.9em;
+  color: #555;
+  line-height: 1.5;
+  flex-grow: 1;
+  margin-bottom: 15px;
+}
+
+.lesson-card-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 20px;
+}
+
+.tag {
+  background-color: #e7f3ff;
+  color: #0c64e4;
+  padding: 4px 10px;
+  border-radius: 15px;
+  font-size: 0.8em;
+  font-weight: 500;
+}
+
+.play-btn {
+  width: 100%;
+  padding: 12px;
+  font-size: 1.1em;
+  font-weight: bold;
+  background-color: #28a745;
+}
+.play-btn:hover {
+  background-color: #218838;
+}
+
+.no-lessons-message {
+  grid-column: 1 / -1;
+  text-align: center;
+  font-size: 1.2em;
+  color: #777;
+  margin-top: 40px;
+}

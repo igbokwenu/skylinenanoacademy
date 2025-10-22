@@ -1,3 +1,4 @@
+/* src/App.css */
 body {
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica,
     Arial, sans-serif;
@@ -759,4 +760,24 @@ button:hover {
   margin-top: 1.5rem;
   padding-top: 1rem;
   border-top: 1px solid #eee;
+}
+
+.publish-section {
+  margin-top: 30px;
+  padding: 20px;
+  text-align: center;
+  background-color: #e7f3ff;
+  border-radius: 8px;
+}
+.publish-section h3 {
+  margin-top: 0;
+}
+.publish-section button {
+  padding: 12px 25px;
+  font-size: 1.1em;
+  background-color: #1a73e8;
+}
+.publish-section button:disabled {
+  background-color: #aaa;
+  cursor: not-allowed;
 }

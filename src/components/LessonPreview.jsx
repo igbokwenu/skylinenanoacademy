@@ -3,8 +3,26 @@
 import React, { useState, useEffect } from "react";
 import placeholderImage from "../assets/skyline_nano_academy.png";
 import { useLanguageModel } from "../hooks/useLanguageModel";
+import { useMonitorDownload } from "../hooks/useMonitorDownload";
+import { db } from "../lib/db";
 
-const LessonPreview = ({ lesson, onClose }) => {
+// Helper function to convert base64 to Blob
+const base64ToBlob = (base64, contentType = "image/png") => {
+  const byteCharacters = atob(base64);
+  const byteArrays = [];
+  for (let offset = 0; offset < byteCharacters.length; offset += 512) {
+    const slice = byteCharacters.slice(offset, offset + 512);
+    const byteNumbers = new Array(slice.length);
+    for (let i = 0; i < slice.length; i++) {
+      byteNumbers[i] = slice.charCodeAt(i);
+    }
+    const byteArray = new Uint8Array(byteNumbers);
+    byteArrays.push(byteArray);
+  }
+  return new Blob(byteArrays, { type: contentType });
+};
+
+const LessonPreview = ({ lesson, lessonSettings, onClose }) => {
   const [editableLesson, setEditableLesson] = useState(
     JSON.parse(JSON.stringify(lesson))
   );
@@ -21,14 +39,19 @@ const LessonPreview = ({ lesson, onClose }) => {
   const [isRewritePopupVisible, setIsRewritePopupVisible] = useState(false);
   const [selectionRange, setSelectionRange] = useState(null);
   const [popupPosition, setPopupPosition] = useState({ top: 0, left: 0 });
-
   const { isLoading: isRewriting, executePrompt: executeRewrite } =
     useLanguageModel({ apiName: "Rewriter" });
   const [isProofreading, setIsProofreading] = useState(false);
-
   const currentScene = editableLesson.lesson[currentSceneIndex];
   const totalScenes = editableLesson.lesson.length;
   const totalQuestions = editableLesson.quiz.length;
+  const [isPublishing, setIsPublishing] = useState(false);
+  const [publishStatus, setPublishStatus] = useState("");
+  // Hook for the summarizer API
+  const { getMonitor } = useMonitorDownload();
+  const { executePrompt: executeSummarize } = useLanguageModel({
+    apiName: "Summarizer",
+  });
 
   const handleNext = () => {
     if (currentSceneIndex < totalScenes - 1) {
@@ -270,6 +293,59 @@ const LessonPreview = ({ lesson, onClose }) => {
     return <p>{highlightedElements}</p>;
   };
 
+  const handlePublish = async () => {
+    setIsPublishing(true);
+    setPublishStatus("Summarizing lesson content...");
+
+    const lessonContent = lesson.lesson.map((p) => p.paragraph).join("\n");
+    const fullText = `${lesson.title}\n${lessonContent}`;
+
+    const blurb = await executeSummarize(fullText, {}, getMonitor());
+
+    if (!blurb) {
+      setPublishStatus("Failed to create summary. Cannot publish.");
+      setTimeout(() => setIsPublishing(false), 3000);
+      return;
+    }
+
+    setPublishStatus("Preparing lesson for saving...");
+
+    // Convert base64 image data to Blobs for efficient storage
+    const lessonWithBlobs = {
+      ...lesson,
+      lesson: lesson.lesson.map((scene) => ({
+        ...scene,
+        imageData: scene.imageData ? base64ToBlob(scene.imageData) : null,
+      })),
+    };
+
+    // Construct the final object
+    const newPublishedLesson = {
+      title: lessonWithBlobs.title,
+      blurb,
+      lesson: lessonWithBlobs.lesson,
+      quiz: lessonWithBlobs.quiz,
+      metadata: { ...lessonSettings },
+      rating: null,
+      createdAt: new Date(), // Good practice to have a timestamp
+    };
+
+    setPublishStatus("Saving lesson to the database...");
+    try {
+      // Use Dexie to add the lesson to IndexedDB
+      await db.lessons.add(newPublishedLesson);
+      setPublishStatus("Lesson Published Successfully!");
+    } catch (error) {
+      console.error("Failed to save lesson to IndexedDB:", error);
+      setPublishStatus(`Error saving lesson: ${error.message}`);
+    } finally {
+      setTimeout(() => {
+        setIsPublishing(false);
+        onClose();
+      }, 2000);
+    }
+  };
+
   return (
     <div className="lesson-preview-overlay">
       <div className="lesson-preview-modal">
@@ -456,6 +532,18 @@ const LessonPreview = ({ lesson, onClose }) => {
                   Submit Quiz
                 </button>
               )}
+            </div>
+          )}
+          {showQuiz && submitted && (
+            <div className="publish-section">
+              <h3>Publish Your Lesson</h3>
+              <p>
+                Save this lesson to your browser to play it anytime from the
+                "Browse Lessons" page.
+              </p>
+              <button onClick={handlePublish} disabled={isPublishing}>
+                {isPublishing ? publishStatus : "Publish Lesson"}
+              </button>
             </div>
           )}
         </main>
