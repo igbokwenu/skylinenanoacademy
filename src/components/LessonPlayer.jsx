@@ -11,23 +11,17 @@ const LessonPlayer = ({ lesson, onClose, onLessonRated }) => {
   const [rating, setRating] = useState(0);
 
   const [currentImageUrl, setCurrentImageUrl] = useState("");
-
   const currentItem = lesson.lesson[currentIndex];
 
   useEffect(() => {
-    // This effect handles creating and revoking the object URL for the current image
     let url = "";
     const imageBlob = lesson.lesson[currentIndex]?.imageData;
-
     if (imageBlob instanceof Blob) {
       url = URL.createObjectURL(imageBlob);
       setCurrentImageUrl(url);
     }
-
     return () => {
-      if (url) {
-        URL.revokeObjectURL(url);
-      }
+      if (url) URL.revokeObjectURL(url);
     };
   }, [currentIndex, lesson.lesson]);
 
@@ -74,9 +68,12 @@ const LessonPlayer = ({ lesson, onClose, onLessonRated }) => {
       </button>
 
       {currentView === "scene" && (
-        <div className="player-scene-view">
+        // Pass the image URL as a CSS custom property (variable)
+        <div
+          className="player-scene-view"
+          style={{ "--bg-image": `url(${currentImageUrl})` }}
+        >
           <div className="player-image-wrapper">
-            {/* Use the state variable for the image src */}
             <img src={currentImageUrl} alt={currentItem.image_prompt} />
           </div>
           <div className="player-paragraph-wrapper">

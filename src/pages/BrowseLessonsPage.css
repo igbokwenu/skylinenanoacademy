@@ -49,14 +49,15 @@
 
 .bl-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-  gap: 25px;
+  /* Make cards smaller to fit more per row */
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 20px;
 }
 
 .lesson-card {
   background: white;
   border-radius: 12px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 4px_12px rgba(0, 0, 0, 0.1);
   overflow: hidden;
   display: flex;
   flex-direction: column;
@@ -70,12 +71,14 @@
 
 .lesson-card-image {
   width: 100%;
-  height: 200px;
+  /* Reduce image height for a more compact card */
+  height: 160px;
   object-fit: cover;
 }
 
 .lesson-card-content {
-  padding: 20px;
+  /* Reduce padding */
+  padding: 15px;
   display: flex;
   flex-direction: column;
   flex-grow: 1;
@@ -83,7 +86,9 @@
 
 .lesson-card-content h3 {
   margin-top: 0;
-  margin-bottom: 10px;
+  margin-bottom: 8px;
+  /* Slightly smaller font */
+  font-size: 1.1em;
 }
 
 .lesson-card-blurb {
@@ -92,13 +97,18 @@
   line-height: 1.5;
   flex-grow: 1;
   margin-bottom: 15px;
+  /* Limit the blurb to a few lines to keep cards uniform */
+  display: -webkit-box;
+  -webkit-line-clamp: 5;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 
 .lesson-card-tags {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
-  margin-bottom: 20px;
+  gap: 6px;
+  margin-bottom: 15px;
 }
 
 .tag {
@@ -106,20 +116,54 @@
   color: #0c64e4;
   padding: 4px 10px;
   border-radius: 15px;
-  font-size: 0.8em;
+  font-size: 0.75em;
   font-weight: 500;
 }
 
-.play-btn {
-  width: 100%;
-  padding: 12px;
-  font-size: 1.1em;
-  font-weight: bold;
-  background-color: #28a745;
+/* NEW styles for the card footer */
+.lesson-card-footer {
+  margin-top: auto; /* Pushes the footer to the bottom */
 }
+
+.card-actions {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.play-btn,
+.delete-btn {
+  flex-grow: 1;
+  padding: 10px;
+  font-size: 1em;
+  font-weight: bold;
+}
+
 .play-btn:hover {
   background-color: #218838;
 }
+
+.delete-btn {
+  background-color: #dc3545;
+}
+.delete-btn:hover {
+  background-color: #c82333;
+}
+
+.avg-rating {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  color: #666;
+}
+
+.star-icon {
+  color: #f5c518;
+  font-size: 1.2em;
+}
+
 
 .no-lessons-message {
   grid-column: 1 / -1;
