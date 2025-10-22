@@ -534,6 +534,7 @@ const LessonCreatorPage = () => {
       {isPreviewVisible && (generatedLesson || lessonWithImages) && (
         <LessonPreview
           lesson={lessonWithImages || generatedLesson}
+          lessonSettings={settings}
           onClose={() => setIsPreviewVisible(false)}
         />
       )}

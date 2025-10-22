@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@tailwindcss/postcss": "^4.1.14",
+    "dexie": "^4.2.1",
     "firebase": "11.7.1-eap-ai-hybridinference.58d92df33",
     "lucide-react": "^0.546.0",
     "react": "^19.1.1",
