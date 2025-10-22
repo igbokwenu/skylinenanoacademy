@@ -136,8 +136,11 @@ const BrowseLessonsPage = () => {
       )}
 
       <div className="bl-header">
-        <h1>Browse Published Lessons</h1>
-        <p>Explore and play the lessons you've created and saved locally.</p>
+        <h3>
+          Browse Published LessonsExplore and play the lessons you've created
+          and saved locally.
+        </h3>
+        {/* <p>Explore and play the lessons you've created and saved locally.</p> */}
       </div>
 
       <div className="bl-filters">

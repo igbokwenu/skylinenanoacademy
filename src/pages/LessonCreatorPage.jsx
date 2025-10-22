@@ -540,11 +540,14 @@ const LessonCreatorPage = () => {
       )}
       <div className="lc-header">
         {/* <img src={lessonCreatorIcon} alt="Lesson Creator" className="lc-header-icon" /> */}
-        <h1>Lesson Creator</h1>
-        <p>
+        <h3>
           Design engaging, story-driven lessons tailored to your students'
           needs.
-        </p>
+        </h3>
+        {/* <p>
+          Design engaging, story-driven lessons tailored to your students'
+          needs.
+        </p> */}
       </div>
       <div className="lc-main">
         <div className="lc-settings-panel">
