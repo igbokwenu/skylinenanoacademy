@@ -5,7 +5,7 @@ import { useLanguageModel } from "../hooks/useLanguageModel";
 import { useMonitorDownload } from "../hooks/useMonitorDownload";
 import LessonPreview from "../components/LessonPreview";
 import lessonCreatorIcon from "../assets/skyline_nano_academy.png";
-import { imageModel } from "../lib/firebase";
+import { imageModel, fileToGenerativePart } from "../lib/firebase";
 
 // --- Configuration (Unchanged) ---
 const lessonParams = {
@@ -90,6 +90,13 @@ const cleanAndParseJson = (rawString) => {
   }
 };
 
+const ageGroupToPromptMap = {
+  "Grades 1-2 (Ages 6-7)": "a 6-7 year old child",
+  "Grades 3-5 (Ages 8-10)": "an 8-10 year old child",
+  "Grades 6-8 (Ages 11-13)": "an 11-13 year old adolescent",
+  "Grades 9-12 (Ages 14-18)": "a 14-18 year old teenager",
+};
+
 const LessonCreatorPage = () => {
   const [settings, setSettings] = useState({
     prompt: examplePrompts[1],
@@ -123,7 +130,10 @@ const LessonCreatorPage = () => {
     facialFeatures: "",
   });
   const [studentImageUse, setStudentImageUse] = useState("description");
-  const [mainCharacter, setMainCharacter] = useState({ name: "", description: "" });
+  const [mainCharacter, setMainCharacter] = useState({
+    name: "",
+    description: "",
+  });
 
   const { getMonitor } = useMonitorDownload();
   const {
@@ -322,45 +332,68 @@ const LessonCreatorPage = () => {
     setIsGeneratingImages(true);
     setGenerationError(null);
 
-    let characterDescription = "";
-    if (settings.perspective.includes("Immersive")) {
-      if (characterMode === "student" && studentImageAnalysis.facialFeatures) {
-        characterDescription = `The character has the following features: ${studentImageAnalysis.facialFeatures}.`;
-      } else if (characterMode === "custom" && customCharacterDescription) {
-        characterDescription = `The character is described as: ${customCharacterDescription}.`;
-      }
-    } else {
-      if (mainCharacter.description) {
-        characterDescription = `The character is described as: ${mainCharacter.description}.`;
-      }
-    }
+    const isImmersiveDirect =
+      settings.perspective.includes("Immersive") &&
+      ((characterMode === "student" &&
+        studentImage &&
+        studentImageUse === "direct") ||
+        (characterMode === "custom" &&
+          customCharacterImage &&
+          customCharacterImageUse === "direct"));
 
-    const characterConsistencyPrompt = `
-      Maintain character consistency across all images.
-      The main character is ${
-        settings.perspective.includes("Immersive")
-          ? characterMode === "student"
-            ? `a student named ${settings.studentName || "the student"}`
-            : "a custom character"
-          : `named ${mainCharacter.name}`
-      }.
-      ${characterDescription}
-      Ensure the character's appearance, including clothing and hairstyle, is consistent in every scene unless the story dictates a change.
-    `;
+    const characterImage =
+      characterMode === "student" ? studentImage : customCharacterImage;
+    const ageDescription = ageGroupToPromptMap[settings.ageGroup] || "a person";
 
     try {
       const imagePromises = generatedLesson.lesson.map(async (scene) => {
-        const fullPrompt = `
-          ${characterDescription} ${scene.image_prompt}
-          ---
-          ${characterConsistencyPrompt}
-          Visual Style: ${settings.style}.
-        `;
+        let textPrompt = "";
+        let generationContent = [];
+
+        if (isImmersiveDirect && characterImage) {
+          // Immersive mode with a direct image: Focus on transferring facial likeness.
+          textPrompt = `Depict a character with the facial features and likeness of the person in the provided image. The character is ${scene.image_prompt}. Ensure the character is portrayed as ${ageDescription}. The overall style should be ${settings.style}.`;
+          const imagePart = await fileToGenerativePart(characterImage);
+          generationContent = [textPrompt, imagePart];
+        } else {
+          // Standard text-to-image or description-based immersive generation.
+          let characterDescription = "";
+          if (settings.perspective.includes("Immersive")) {
+            // Use the refined facial features from image analysis
+            if (
+              characterMode === "student" &&
+              studentImageAnalysis.facialFeatures
+            ) {
+              characterDescription = `The main character has these features: ${studentImageAnalysis.facialFeatures}. `;
+            } else if (
+              characterMode === "custom" &&
+              customCharacterDescription
+            ) {
+              characterDescription = `The main character is described as: ${customCharacterDescription}. `;
+            }
+          } else {
+            if (mainCharacter.description) {
+              characterDescription = `The main character is ${mainCharacter.name}, who is described as: ${mainCharacter.description}. `;
+            }
+          }
+
+          textPrompt = `${characterDescription}The scene is: ${scene.image_prompt}. The character should be portrayed as ${ageDescription}. The overall style should be ${settings.style}.`;
+          generationContent = [textPrompt];
+        }
 
         try {
-          const result = await imageModel.generateContent(fullPrompt);
+          const result = await imageModel.generateContent({
+            contents: [
+              {
+                parts: generationContent.map((content) =>
+                  typeof content === "string" ? { text: content } : content
+                ),
+              },
+            ],
+          });
           const response = await result.response;
           const candidates = response.candidates;
+
           if (candidates && candidates.length > 0) {
             const imagePart = candidates[0].content.parts.find(
               (part) => part.inlineData
@@ -369,13 +402,13 @@ const LessonCreatorPage = () => {
               return { ...scene, imageData: imagePart.inlineData.data };
             }
           }
-          return { ...scene, imageData: null }; // Return scene even if image fails
+          return { ...scene, imageData: null };
         } catch (error) {
           console.error(
             `Image generation failed for scene ${scene.scene}:`,
             error
           );
-          return { ...scene, imageData: null }; // Keep scene on individual failure
+          return { ...scene, imageData: null };
         }
       });
 
@@ -394,7 +427,6 @@ const LessonCreatorPage = () => {
       setIsGeneratingImages(false);
     }
   };
-
   const handleSettingChange = (e) => {
     const { name, value } = e.target;
     setSettings((prev) => ({ ...prev, [name]: value }));
@@ -413,7 +445,7 @@ const LessonCreatorPage = () => {
           {
             type: "text",
             value:
-              'Analyze the person in this image and provide their gender ( Select from exactly: Male, Female, Other), ethnicity, and a detailed description of their facial features suitable for creating an animated character. Focus on key characteristics like eye shape and color, nose shape, mouth shape, jawline, and any distinctive features like freckles, scars, or glasses. The description should be detailed enough to be used for character consistency in image generation. For the ethnicity, you must choose from one of the following options: "American Indian or Alaska Native", "Asian", "Black or African American", "White", "Hispanic or Latino", "Middle Eastern or North African (MENA)", "Native Hawaiian or Pacific Islander". Respond in JSON format with the keys: "gender", "ethnicity", "facialFeatures".',
+              'Analyze the person in this image. Strictly describe only their facial and head features (like eye shape and color, nose, mouth, jawline, hair style and color, freckles, glasses, etc.), gender ( Select from exactly: Male, Female, Other, [add any other options]), and ethnicity. **Crucially, do NOT describe their clothing, non-facial accessories (like hats or headphones), or the background.** The description must be suitable for transferring their likeness onto a different character in any setting, regardless of the original photo\'s context. For the ethnicity, you must choose from one of the following options: "American Indian or Alaska Native", "Asian", "Black or African American", "White", "Hispanic or Latino", "Middle Eastern or North African (MENA)", "Native Hawaiian or Pacific Islander". Respond in JSON format with the keys: "gender", "ethnicity", "facialFeatures".',
           },
         ],
       },
@@ -559,7 +591,10 @@ const LessonCreatorPage = () => {
             {!settings.perspective.includes("Immersive") && (
               <div className="setting-item main-character-panel">
                 <label>Main Character</label>
-                <button onClick={handleGenerateCharacter} disabled={isAnalysisLoading}>
+                <button
+                  onClick={handleGenerateCharacter}
+                  disabled={isAnalysisLoading}
+                >
                   {isAnalysisLoading ? "Generating..." : "Generate Character"}
                 </button>
                 <input
@@ -567,7 +602,10 @@ const LessonCreatorPage = () => {
                   placeholder="Character Name"
                   value={mainCharacter.name}
                   onChange={(e) =>
-                    setMainCharacter((prev) => ({ ...prev, name: e.target.value }))
+                    setMainCharacter((prev) => ({
+                      ...prev,
+                      name: e.target.value,
+                    }))
                   }
                 />
                 <textarea

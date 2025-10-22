@@ -1,17 +1,12 @@
 // src/App.jsx
 
 import React, { useState, useEffect } from "react";
-
 import { Routes, Route, NavLink, useLocation } from "react-router-dom";
-
 import "./App.css";
-
 import HomePage from "./pages/HomePage";
-
 import LessonCreatorPage from "./pages/LessonCreatorPage";
-
+import BrowseLessonsPage from "./pages/BrowseLessonsPage";
 import FirebaseAiPage from "./pages/FirebaseAiPage"; // Import the new page
-
 import { useMonitorDownload } from "./hooks/useMonitorDownload";
 
 function App() {
@@ -37,7 +32,8 @@ function App() {
     switch (location.pathname) {
       case "/lesson-creator":
         return "Robust On-Device AI - Lesson Creator";
-
+      case "/browse-lessons": // Add this case
+        return "Robust On-Device AI - Browse Lessons";
       case "/firebase-ai":
         return "Robust On-Device AI - Firebase AI";
 
@@ -68,6 +64,13 @@ function App() {
             Lesson Creator
           </NavLink>
 
+             <NavLink
+            to="/browse-lessons"
+            className={({ isActive }) => (isActive ? "nav-active" : "")}
+          >
+            Browse Lessons
+          </NavLink>
+
           <NavLink
             to="/firebase-ai"
             className={({ isActive }) => (isActive ? "nav-active" : "")}
@@ -85,6 +88,7 @@ function App() {
         <Routes>
           <Route path="/" element={<HomePage />} />
           <Route path="/lesson-creator" element={<LessonCreatorPage />} />
+           <Route path="/browse-lessons" element={<BrowseLessonsPage />} />
           <Route path="/firebase-ai" element={<FirebaseAiPage />} />{" "}
           {/* Add the new route */}
         </Routes>
