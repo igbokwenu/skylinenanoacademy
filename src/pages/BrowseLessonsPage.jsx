@@ -37,29 +37,51 @@ const BrowseLessonsPage = () => {
 
   useEffect(() => {
     const fetchLessons = async () => {
-      // Fetch all lessons from IndexedDB and order by creation date
       const storedLessons = await db.lessons
         .orderBy("createdAt")
         .reverse()
         .toArray();
       setLessons(storedLessons);
     };
-
     fetchLessons();
-
-    // Dexie's liveQuery can also be used here for real-time updates
-    // but a simple fetch is fine for this use case.
   }, []);
 
   const handleLessonRated = async (lessonId, rating) => {
-    // Update the rating in the database
-    await db.lessons.update(lessonId, { rating });
-    // Update the local state to reflect the change immediately
-    setLessons((prevLessons) =>
-      prevLessons.map((lesson) =>
-        lesson.id === lessonId ? { ...lesson, rating } : lesson
-      )
+    // Get the existing lesson
+    const lessonToUpdate = await db.lessons.get(lessonId);
+    if (lessonToUpdate) {
+      // Add the new rating to the ratings array
+      const newRatings = [...(lessonToUpdate.ratings || []), rating];
+      await db.lessons.update(lessonId, { ratings: newRatings });
+
+      // Update local state immediately
+      setLessons((prevLessons) =>
+        prevLessons.map((lesson) =>
+          lesson.id === lessonId ? { ...lesson, ratings: newRatings } : lesson
+        )
+      );
+    }
+  };
+
+  const handleDeleteLesson = async (lessonId) => {
+    // Show a confirmation dialog
+    const isConfirmed = window.confirm(
+      "Are you sure you want to delete this lesson? This action cannot be undone."
     );
+
+    if (isConfirmed) {
+      try {
+        // Delete from IndexedDB
+        await db.lessons.delete(lessonId);
+        // Update state to remove the lesson from the UI
+        setLessons((prevLessons) =>
+          prevLessons.filter((lesson) => lesson.id !== lessonId)
+        );
+      } catch (error) {
+        console.error("Failed to delete lesson:", error);
+        alert("There was an error deleting the lesson.");
+      }
+    }
   };
 
   const handleFilterChange = (e) => {
@@ -91,6 +113,16 @@ const BrowseLessonsPage = () => {
     }, [imageData]);
 
     return <img src={imageUrl} alt={title} className="lesson-card-image" />;
+  };
+
+  // Helper function to calculate average rating
+  const calculateAverageRating = (ratings) => {
+    if (!ratings || ratings.length === 0) {
+      return "No ratings yet";
+    }
+    const sum = ratings.reduce((acc, curr) => acc + curr, 0);
+    const average = sum / ratings.length;
+    return `Avg: ${average.toFixed(1)} / 5.0`;
   };
 
   return (
@@ -146,12 +178,28 @@ const BrowseLessonsPage = () => {
                   <span className="tag">{lesson.metadata.style}</span>
                   <span className="tag">{lesson.metadata.ageGroup}</span>
                 </div>
-                <button
-                  className="play-btn"
-                  onClick={() => setPlayingLesson(lesson)}
-                >
-                  Play Lesson
-                </button>
+
+                {/* --- CARD FOOTER WITH RATING AND ACTIONS --- */}
+                <div className="lesson-card-footer">
+                  <div className="avg-rating">
+                    <span className="star-icon">★</span>
+                    <span>{calculateAverageRating(lesson.ratings)}</span>
+                  </div>
+                  <div className="card-actions">
+                    <button
+                      className="play-btn"
+                      onClick={() => setPlayingLesson(lesson)}
+                    >
+                      Play
+                    </button>
+                    <button
+                      className="delete-btn"
+                      onClick={() => handleDeleteLesson(lesson.id)}
+                    >
+                      Delete
+                    </button>
+                  </div>
+                </div>
               </div>
             </div>
           ))

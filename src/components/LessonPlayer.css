@@ -32,6 +32,7 @@
   height: 100%;
   position: relative;
   overflow: hidden;
+  background-color: #000; /* Fallback background */
 }
 
 .player-image-wrapper {
@@ -40,21 +41,43 @@
   left: 0;
   width: 100%;
   height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
-.player-image-wrapper img {
+/* NEW: Background blurred image */
+.player-image-wrapper::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
   width: 100%;
   height: 100%;
-  object-fit: cover;
+  background-image: var(--bg-image);
+  background-size: cover;
+  background-position: center;
+  filter: blur(20px) brightness(0.6);
+  transform: scale(1.1); /* To hide blurred edges */
   animation: slowZoom 20s linear infinite alternate;
+}
+
+/* MODIFIED: The main, sharp image */
+.player-image-wrapper img {
+  position: relative; /* To display on top of the ::before pseudo-element */
+  width: 100%;
+  height: 100%;
+  /* This is the key change: fits the whole image without cropping */
+  object-fit: contain;
+  /* Removed animation from main image to keep it stable */
 }
 
 @keyframes slowZoom {
   from {
-    transform: scale(1);
+    transform: scale(1.1);
   }
   to {
-    transform: scale(1.1);
+    transform: scale(1.2);
   }
 }
 

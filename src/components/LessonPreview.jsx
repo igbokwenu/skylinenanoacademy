@@ -297,10 +297,16 @@ const LessonPreview = ({ lesson, lessonSettings, onClose }) => {
     setIsPublishing(true);
     setPublishStatus("Summarizing lesson content...");
 
+    // 1. Concatenate all text content for the summarizer
     const lessonContent = lesson.lesson.map((p) => p.paragraph).join("\n");
     const fullText = `${lesson.title}\n${lessonContent}`;
 
-    const blurb = await executeSummarize(fullText, {}, getMonitor());
+    // --- PROMPT ENHANCEMENT ---
+    // Create a more specific prompt for the summarizer API
+    const summarizerPrompt = `Based on the following lesson content, create a compelling hook or blurb, like one you'd see on the back of a book or for a movie trailer. It must be exciting and spark curiosity. **Crucially, the entire blurb must be a maximum of 70 words.** Here is the content:\n\n${fullText}`;
+
+    // 2. Execute the enhanced summarizer prompt
+    const blurb = await executeSummarize(summarizerPrompt, {}, getMonitor());
 
     if (!blurb) {
       setPublishStatus("Failed to create summary. Cannot publish.");
@@ -319,20 +325,19 @@ const LessonPreview = ({ lesson, lessonSettings, onClose }) => {
       })),
     };
 
-    // Construct the final object
+    // Construct the final object, initializing ratings as an empty array
     const newPublishedLesson = {
       title: lessonWithBlobs.title,
       blurb,
       lesson: lessonWithBlobs.lesson,
       quiz: lessonWithBlobs.quiz,
       metadata: { ...lessonSettings },
-      rating: null,
-      createdAt: new Date(), // Good practice to have a timestamp
+      ratings: [], // Initialize ratings as an empty array instead of `rating: null`
+      createdAt: new Date(),
     };
 
     setPublishStatus("Saving lesson to the database...");
     try {
-      // Use Dexie to add the lesson to IndexedDB
       await db.lessons.add(newPublishedLesson);
       setPublishStatus("Lesson Published Successfully!");
     } catch (error) {
