@@ -123,6 +123,7 @@ const LessonCreatorPage = () => {
     facialFeatures: "",
   });
   const [studentImageUse, setStudentImageUse] = useState("description");
+  const [mainCharacter, setMainCharacter] = useState({ name: "", description: "" });
 
   const { getMonitor } = useMonitorDownload();
   const {
@@ -191,36 +192,40 @@ const LessonCreatorPage = () => {
   );
 
   const userRequestPrompt = useMemo(() => {
-    let studentInfo = "";
+    let characterInfo = "";
     if (settings.perspective.includes("Immersive")) {
       if (characterMode === "student") {
-        studentInfo = `The main character is a student.`;
+        characterInfo = `The main character is a student.`;
         if (settings.studentName) {
-          studentInfo += ` Their name is "${settings.studentName}".`;
+          characterInfo += ` Their name is "${settings.studentName}".`;
         }
         if (studentImageUse === "description") {
           if (studentImageAnalysis.gender)
-            studentInfo += ` Their gender is ${studentImageAnalysis.gender}.`;
+            characterInfo += ` Their gender is ${studentImageAnalysis.gender}.`;
           if (studentImageAnalysis.ethnicity)
-            studentInfo += ` Their ethnicity is ${studentImageAnalysis.ethnicity}.`;
+            characterInfo += ` Their ethnicity is ${studentImageAnalysis.ethnicity}.`;
           if (studentImageAnalysis.facialFeatures)
-            studentInfo += ` Facial features: ${studentImageAnalysis.facialFeatures}.`;
+            characterInfo += ` Facial features: ${studentImageAnalysis.facialFeatures}.`;
           if (studentImageAnalysis.personalFacts)
-            studentInfo += ` Personal facts: ${studentImageAnalysis.personalFacts}.`;
+            characterInfo += ` Personal facts: ${studentImageAnalysis.personalFacts}.`;
         } else {
           if (settings.studentGender)
-            studentInfo += ` Their gender is ${settings.studentGender}.`;
+            characterInfo += ` Their gender is ${settings.studentGender}.`;
           if (settings.studentEthnicity)
-            studentInfo += ` Their ethnicity is ${settings.studentEthnicity}.`;
+            characterInfo += ` Their ethnicity is ${settings.studentEthnicity}.`;
         }
         if (settings.studentPersonalFacts) {
-          studentInfo += ` Here are some personal facts about them: ${settings.studentPersonalFacts}.`;
+          characterInfo += ` Here are some personal facts about them: ${settings.studentPersonalFacts}.`;
         }
       } else {
-        studentInfo = `The main character is a custom character.`;
+        characterInfo = `The main character is a custom character.`;
         if (customCharacterDescription) {
-          studentInfo += ` Description: ${customCharacterDescription}.`;
+          characterInfo += ` Description: ${customCharacterDescription}.`;
         }
+      }
+    } else {
+      if (mainCharacter.name && mainCharacter.description) {
+        characterInfo = `The main character is named ${mainCharacter.name}. Description: ${mainCharacter.description}.`;
       }
     }
 
@@ -234,7 +239,7 @@ const LessonCreatorPage = () => {
       - Visual Style: ${settings.style} for the image prompts.
       - Tone: ${settings.tone} for the story paragraphs.
       - Target Age Group: ${settings.ageGroup}
-      - Narrative Perspective: ${settings.perspective}. ${studentInfo}
+      - Narrative Perspective: ${settings.perspective}. ${characterInfo}
 
       For each of the ${sceneCount} scenes, create a detailed 'image_prompt' and a 'paragraph'.
       For each of the ${sceneCount} quiz questions, create a 'question', 4 'options', and an 'answer'.
@@ -246,6 +251,7 @@ const LessonCreatorPage = () => {
     studentImageUse,
     studentImageAnalysis,
     customCharacterDescription,
+    mainCharacter,
   ]);
 
   const handleCreateLesson = async () => {
@@ -323,14 +329,20 @@ const LessonCreatorPage = () => {
       } else if (characterMode === "custom" && customCharacterDescription) {
         characterDescription = `The character is described as: ${customCharacterDescription}.`;
       }
+    } else {
+      if (mainCharacter.description) {
+        characterDescription = `The character is described as: ${mainCharacter.description}.`;
+      }
     }
 
     const characterConsistencyPrompt = `
       Maintain character consistency across all images.
       The main character is ${
-        characterMode === "student"
-          ? `a student named ${settings.studentName || "the student"}`
-          : "a custom character"
+        settings.perspective.includes("Immersive")
+          ? characterMode === "student"
+            ? `a student named ${settings.studentName || "the student"}`
+            : "a custom character"
+          : `named ${mainCharacter.name}`
       }.
       ${characterDescription}
       Ensure the character's appearance, including clothing and hairstyle, is consistent in every scene unless the story dictates a change.
@@ -458,6 +470,33 @@ const LessonCreatorPage = () => {
     }
   };
 
+  const handleGenerateCharacter = async () => {
+    const prompt = `Based on the lesson topic "${settings.prompt}", create a main character with a name and a detailed visual description suitable for consistent image generation. Respond in JSON format with the keys: "name", "description".`;
+
+    const jsonSchema = {
+      type: "object",
+      properties: {
+        name: { type: "string" },
+        description: { type: "string" },
+      },
+      required: ["name", "description"],
+    };
+
+    const result = await executeImageAnalysis(
+      [{ role: "user", content: [{ type: "text", value: prompt }] }],
+      {
+        responseConstraint: { schema: jsonSchema },
+      }
+    );
+
+    if (result) {
+      const parsedResult = cleanAndParseJson(result);
+      if (parsedResult) {
+        setMainCharacter(parsedResult);
+      }
+    }
+  };
+
   return (
     <div className="lesson-creator-container">
       {isPreviewVisible && (generatedLesson || lessonWithImages) && (
@@ -517,6 +556,33 @@ const LessonCreatorPage = () => {
                 </select>
               </div>
             ))}
+            {!settings.perspective.includes("Immersive") && (
+              <div className="setting-item main-character-panel">
+                <label>Main Character</label>
+                <button onClick={handleGenerateCharacter} disabled={isAnalysisLoading}>
+                  {isAnalysisLoading ? "Generating..." : "Generate Character"}
+                </button>
+                <input
+                  type="text"
+                  placeholder="Character Name"
+                  value={mainCharacter.name}
+                  onChange={(e) =>
+                    setMainCharacter((prev) => ({ ...prev, name: e.target.value }))
+                  }
+                />
+                <textarea
+                  placeholder="Character Description"
+                  value={mainCharacter.description}
+                  onChange={(e) =>
+                    setMainCharacter((prev) => ({
+                      ...prev,
+                      description: e.target.value,
+                    }))
+                  }
+                  rows={4}
+                />
+              </div>
+            )}
             {settings.perspective.includes("Immersive") && (
               <>
                 <div className="setting-item">
