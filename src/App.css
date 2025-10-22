@@ -283,6 +283,10 @@ button:hover {
   background-color: #218838;
 }
 
+.generate-img-btn {
+  margin-top: 10px;
+}
+
 .abort-btn {
   background-color: #dc3545;
   margin-top: 10px;
