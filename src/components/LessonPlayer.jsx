@@ -1,7 +1,10 @@
 // src/components/LessonPlayer.jsx
 
-import React, { useState, useEffect } from "react";
-import "./LessonPlayer.css"; // We will create this CSS file
+import React, { useState, useEffect, useRef } from "react";
+import "./LessonPlayer.css";
+import placeholderImage from "../assets/skyline_nano_academy.png";
+
+const AUTO_PLAY_DELAY = 10000; // 10 seconds for auto-advancing slides
 
 const LessonPlayer = ({ lesson, onClose, onLessonRated }) => {
   const [currentView, setCurrentView] = useState("scene"); // 'scene', 'quiz', 'rating'
@@ -9,21 +12,67 @@ const LessonPlayer = ({ lesson, onClose, onLessonRated }) => {
   const [userAnswers, setUserAnswers] = useState({});
   const [submitted, setSubmitted] = useState(false);
   const [rating, setRating] = useState(0);
-
   const [currentImageUrl, setCurrentImageUrl] = useState("");
+  // --- NEW STATE FOR TTS AND AUTOPLAY ---
+  const [isTtsEnabled, setIsTtsEnabled] = useState(true);
+  const [isAutoPlayEnabled, setIsAutoPlayEnabled] = useState(true);
+  const autoPlayTimerRef = useRef(null);
+
   const currentItem = lesson.lesson[currentIndex];
 
   useEffect(() => {
     let url = "";
     const imageBlob = lesson.lesson[currentIndex]?.imageData;
+
     if (imageBlob instanceof Blob) {
       url = URL.createObjectURL(imageBlob);
       setCurrentImageUrl(url);
+    } else {
+      // If no image data, use the imported placeholder
+      setCurrentImageUrl(placeholderImage);
     }
+
     return () => {
       if (url) URL.revokeObjectURL(url);
     };
   }, [currentIndex, lesson.lesson]);
+
+  // --- TTS LOGIC ---
+  useEffect(() => {
+    // Cancel any speech that might be ongoing from a previous slide
+    window.speechSynthesis.cancel();
+
+    if (isTtsEnabled && currentView === "scene" && currentItem.paragraph) {
+      const utterance = new SpeechSynthesisUtterance(currentItem.paragraph);
+      window.speechSynthesis.speak(utterance);
+    }
+
+    // Cleanup: stop speech when the component unmounts
+    return () => {
+      window.speechSynthesis.cancel();
+    };
+  }, [currentIndex, currentView, isTtsEnabled, currentItem.paragraph]);
+
+  // --- AUTOPLAY LOGIC ---
+  useEffect(() => {
+    // Clear any existing timer when dependencies change
+    if (autoPlayTimerRef.current) {
+      clearTimeout(autoPlayTimerRef.current);
+    }
+
+    if (isAutoPlayEnabled && currentView === "scene") {
+      autoPlayTimerRef.current = setTimeout(() => {
+        handleNext();
+      }, AUTO_PLAY_DELAY);
+    }
+
+    // Cleanup: clear the timer if the component unmounts or auto-play is turned off
+    return () => {
+      if (autoPlayTimerRef.current) {
+        clearTimeout(autoPlayTimerRef.current);
+      }
+    };
+  }, [currentIndex, currentView, isAutoPlayEnabled]);
 
   const handleNext = () => {
     if (currentIndex < lesson.lesson.length - 1) {
@@ -61,20 +110,47 @@ const LessonPlayer = ({ lesson, onClose, onLessonRated }) => {
       0
     );
 
+  const handleKeyDown = (e) => {
+    if (e.key === "Escape") onClose();
+    if (e.key === "ArrowRight" && currentView === "scene") handleNext();
+    if (e.key === "ArrowLeft" && currentView === "scene") handlePrev();
+  };
+
+  useEffect(() => {
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [currentIndex, currentView]);
+
   return (
     <div className="lesson-player-overlay">
+      <div className="player-controls">
+        <button
+          onClick={() => setIsTtsEnabled(!isTtsEnabled)}
+          className="control-btn"
+        >
+          {isTtsEnabled ? "Mute TTS" : "Play TTS"}
+        </button>
+        <button
+          onClick={() => setIsAutoPlayEnabled(!isAutoPlayEnabled)}
+          className="control-btn"
+        >
+          {isAutoPlayEnabled ? "Auto-Play: On" : "Auto-Play: Off"}
+        </button>
+      </div>
       <button className="player-close-btn" onClick={onClose}>
         &times;
       </button>
 
       {currentView === "scene" && (
-        // Pass the image URL as a CSS custom property (variable)
         <div
           className="player-scene-view"
           style={{ "--bg-image": `url(${currentImageUrl})` }}
         >
           <div className="player-image-wrapper">
-            <img src={currentImageUrl} alt={currentItem.image_prompt} />
+            <img
+              src={currentImageUrl}
+              alt={currentItem.image_prompt || "Lesson Scene"}
+            />
           </div>
           <div className="player-paragraph-wrapper">
             <p>{currentItem.paragraph}</p>

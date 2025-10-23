@@ -314,6 +314,9 @@ const LessonPreview = ({ lesson, lessonSettings, onClose }) => {
       return;
     }
 
+    // Remove any asterisks or hashes and trim whitespace.
+    const sanitizedBlurb = blurb.replace(/[*#]/g, "").trim();
+
     setPublishStatus("Preparing lesson for saving...");
 
     // Convert base64 image data to Blobs for efficient storage
@@ -328,7 +331,7 @@ const LessonPreview = ({ lesson, lessonSettings, onClose }) => {
     // Construct the final object, initializing ratings as an empty array
     const newPublishedLesson = {
       title: lessonWithBlobs.title,
-      blurb,
+      blurb: sanitizedBlurb,
       lesson: lessonWithBlobs.lesson,
       quiz: lessonWithBlobs.quiz,
       metadata: { ...lessonSettings },
