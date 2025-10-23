@@ -563,6 +563,11 @@ button:hover {
   border-radius: 8px;
   box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
   z-index: 1001;
+  width: 90%;
+  max-width: 800px;
+  display: flex;
+  flex-direction: column;
+  max-height: 80vh;
 }
 
 /* --- NEW STYLES FOR SCENE EDITOR --- */
@@ -728,9 +733,10 @@ button:hover {
 }
 
 /* --- STYLES FOR PROOFREAD MODAL --- */
-.proofread-modal {
-  width: 90%;
-  max-width: 800px;
+
+.proofread-content {
+  overflow-y: auto;
+  padding-right: 15px; /* For scrollbar */
 }
 
 .proofread-content h4 {
