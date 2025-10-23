@@ -29,7 +29,7 @@ const BrowseLessonsPage = () => {
   const [lessons, setLessons] = useState([]);
   const [playingLesson, setPlayingLesson] = useState(null);
   const [lessonToPrint, setLessonToPrint] = useState(null);
-  const printComponentRef = useRef(null); // Initialize ref with null
+  const printComponentRef = useRef(null); // Initialize the ref with null
 
   const [filters, setFilters] = useState({
     format: "All",
@@ -39,19 +39,23 @@ const BrowseLessonsPage = () => {
     perspective: "All",
   });
 
-  // 1. Configure useReactToPrint. It's now just a function we can call.
+  // --- THIS IS THE CORRECTED PRINT HOOK SETUP ---
+  // The hook now directly references the ref object.
+  // It returns a function that we will call to trigger the print.
   const handlePrint = useReactToPrint({
     content: () => printComponentRef.current,
-    onAfterPrint: () => setLessonToPrint(null),
+    onAfterPrint: () => setLessonToPrint(null), // Clean up after printing
     removeAfterPrint: true,
   });
 
-  // 2. This is the corrected and robust effect.
-  useLayoutEffect(() => {
+  useEffect(() => {
+    // This effect runs after the component re-renders with lessonToPrint set.
+    // By this time, the <PrintableLesson> is in the DOM and the ref is attached.
     if (lessonToPrint) {
       handlePrint();
     }
   }, [lessonToPrint, handlePrint]);
+  // --- END OF CORRECTION ---
 
   useEffect(() => {
     const fetchLessons = async () => {
@@ -64,7 +68,6 @@ const BrowseLessonsPage = () => {
     fetchLessons();
   }, []);
 
-  // ... (All other handlers like handleLessonRated, handleDeleteLesson, etc. are correct and do not need changes)
   const handleLessonRated = async (lessonId, rating) => {
     const lessonToUpdate = await db.lessons.get(lessonId);
     if (lessonToUpdate) {
@@ -80,17 +83,16 @@ const BrowseLessonsPage = () => {
 
   const handleDeleteLesson = async (lessonId) => {
     const isConfirmed = window.confirm(
-      "Are you sure you want to delete this lesson? This action cannot be undone."
+      "Are you sure you want to delete this lesson?"
     );
     if (isConfirmed) {
       try {
         await db.lessons.delete(lessonId);
         setLessons((prevLessons) =>
-          prevLessons.filter((lesson) => lesson.id !== lessonId)
+          prevLessons.filter((l) => l.id !== lessonId)
         );
       } catch (error) {
         console.error("Failed to delete lesson:", error);
-        alert("There was an error deleting the lesson.");
       }
     }
   };
@@ -122,11 +124,8 @@ const BrowseLessonsPage = () => {
   };
 
   const calculateAverageRating = (ratings) => {
-    if (!ratings || ratings.length === 0) {
-      return "No ratings yet";
-    }
-    const sum = ratings.reduce((acc, curr) => acc + curr, 0);
-    const average = sum / ratings.length;
+    if (!ratings || ratings.length === 0) return "No ratings yet";
+    const average = ratings.reduce((a, b) => a + b, 0) / ratings.length;
     return `Avg: ${average.toFixed(1)} / 5.0`;
   };
 
@@ -140,6 +139,7 @@ const BrowseLessonsPage = () => {
         />
       )}
 
+      {/* The hidden component for printing. `ref` is assigned here. */}
       <div className="hidden-for-print">
         {lessonToPrint && (
           <PrintableLesson ref={printComponentRef} lesson={lessonToPrint} />
@@ -201,6 +201,7 @@ const BrowseLessonsPage = () => {
                     >
                       Play
                     </button>
+                    {/* The onClick now just sets the state. The useEffect handles the printing. */}
                     <button
                       className="print-btn"
                       onClick={() => setLessonToPrint(lesson)}
@@ -219,9 +220,7 @@ const BrowseLessonsPage = () => {
             </div>
           ))
         ) : (
-          <p className="no-lessons-message">
-            No published lessons found. Go to the Lesson Creator to make one!
-          </p>
+          <p className="no-lessons-message">No published lessons found.</p>
         )}
       </div>
     </div>
