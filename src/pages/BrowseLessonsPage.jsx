@@ -29,7 +29,6 @@ const BrowseLessonsPage = () => {
   const [lessons, setLessons] = useState([]);
   const [playingLesson, setPlayingLesson] = useState(null);
   const [lessonToPrint, setLessonToPrint] = useState(null);
-  const printComponentRef = useRef(null); // Initialize the ref with null
 
   const [filters, setFilters] = useState({
     format: "All",
@@ -39,23 +38,12 @@ const BrowseLessonsPage = () => {
     perspective: "All",
   });
 
-  // --- THIS IS THE CORRECTED PRINT HOOK SETUP ---
-  // The hook now directly references the ref object.
-  // It returns a function that we will call to trigger the print.
-  const handlePrint = useReactToPrint({
-    content: () => printComponentRef.current,
-    onAfterPrint: () => setLessonToPrint(null), // Clean up after printing
-    removeAfterPrint: true,
-  });
+  const componentRef = useRef();
 
-  useEffect(() => {
-    // This effect runs after the component re-renders with lessonToPrint set.
-    // By this time, the <PrintableLesson> is in the DOM and the ref is attached.
-    if (lessonToPrint) {
-      handlePrint();
-    }
-  }, [lessonToPrint, handlePrint]);
-  // --- END OF CORRECTION ---
+  // FIXED: Use contentRef instead of content
+  const handlePrint = useReactToPrint({
+    contentRef: componentRef,
+  });
 
   useEffect(() => {
     const fetchLessons = async () => {
@@ -83,16 +71,17 @@ const BrowseLessonsPage = () => {
 
   const handleDeleteLesson = async (lessonId) => {
     const isConfirmed = window.confirm(
-      "Are you sure you want to delete this lesson?"
+      "Are you sure you want to delete this lesson? This action cannot be undone."
     );
     if (isConfirmed) {
       try {
         await db.lessons.delete(lessonId);
         setLessons((prevLessons) =>
-          prevLessons.filter((l) => l.id !== lessonId)
+          prevLessons.filter((lesson) => lesson.id !== lessonId)
         );
       } catch (error) {
         console.error("Failed to delete lesson:", error);
+        alert("There was an error deleting the lesson.");
       }
     }
   };
@@ -124,9 +113,21 @@ const BrowseLessonsPage = () => {
   };
 
   const calculateAverageRating = (ratings) => {
-    if (!ratings || ratings.length === 0) return "No ratings yet";
-    const average = ratings.reduce((a, b) => a + b, 0) / ratings.length;
+    if (!ratings || ratings.length === 0) {
+      return "No ratings yet";
+    }
+    const sum = ratings.reduce((acc, curr) => acc + curr, 0);
+    const average = sum / ratings.length;
     return `Avg: ${average.toFixed(1)} / 5.0`;
+  };
+
+  // FIXED: Simplified print handler
+  const handlePrintLesson = (lesson) => {
+    setLessonToPrint(lesson);
+    // Use setTimeout to ensure the DOM is updated before printing
+    setTimeout(() => {
+      handlePrint();
+    }, 100);
   };
 
   return (
@@ -139,10 +140,9 @@ const BrowseLessonsPage = () => {
         />
       )}
 
-      {/* The hidden component for printing. `ref` is assigned here. */}
-      <div className="hidden-for-print">
+      <div style={{ display: "none" }}>
         {lessonToPrint && (
-          <PrintableLesson ref={printComponentRef} lesson={lessonToPrint} />
+          <PrintableLesson ref={componentRef} lesson={lessonToPrint} />
         )}
       </div>
 
@@ -201,10 +201,9 @@ const BrowseLessonsPage = () => {
                     >
                       Play
                     </button>
-                    {/* The onClick now just sets the state. The useEffect handles the printing. */}
                     <button
                       className="print-btn"
-                      onClick={() => setLessonToPrint(lesson)}
+                      onClick={() => handlePrintLesson(lesson)}
                     >
                       Print
                     </button>
@@ -220,7 +219,10 @@ const BrowseLessonsPage = () => {
             </div>
           ))
         ) : (
-          <p className="no-lessons-message">No published lessons found. Create a lesson in the Lesson creator.</p>
+          <p className="no-lessons-message">
+            No published lessons found. Click the Lesson Creator tab at the top
+            to make one!
+          </p>
         )}
       </div>
     </div>
