@@ -220,7 +220,7 @@ const BrowseLessonsPage = () => {
             </div>
           ))
         ) : (
-          <p className="no-lessons-message">No published lessons found.</p>
+          <p className="no-lessons-message">No published lessons found. Create a lesson in the Lesson creator.</p>
         )}
       </div>
     </div>
