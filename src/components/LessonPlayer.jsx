@@ -1,86 +1,33 @@
 // src/components/LessonPlayer.jsx
 
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react"; // 1. Import useCallback
 import "./LessonPlayer.css";
 import placeholderImage from "../assets/skyline_nano_academy.png";
 
-const AUTO_PLAY_DELAY = 10000; // 10 seconds for auto-advancing slides
+const AUTO_PLAY_DELAY = 20000;
 
 const LessonPlayer = ({ lesson, onClose, onLessonRated }) => {
-  const [currentView, setCurrentView] = useState("scene"); // 'scene', 'quiz', 'rating'
+  // --- STATE AND REFS (First) ---
+  const [currentView, setCurrentView] = useState("scene");
   const [currentIndex, setCurrentIndex] = useState(0);
   const [userAnswers, setUserAnswers] = useState({});
   const [submitted, setSubmitted] = useState(false);
   const [rating, setRating] = useState(0);
-  const [currentImageUrl, setCurrentImageUrl] = useState("");
-  // --- NEW STATE FOR TTS AND AUTOPLAY ---
+  const [currentImageUrl, setCurrentImageUrl] = useState(placeholderImage);
   const [isTtsEnabled, setIsTtsEnabled] = useState(true);
   const [isAutoPlayEnabled, setIsAutoPlayEnabled] = useState(true);
   const autoPlayTimerRef = useRef(null);
 
   const currentItem = lesson.lesson[currentIndex];
 
-  useEffect(() => {
-    let url = "";
-    const imageBlob = lesson.lesson[currentIndex]?.imageData;
-
-    if (imageBlob instanceof Blob) {
-      url = URL.createObjectURL(imageBlob);
-      setCurrentImageUrl(url);
-    } else {
-      // If no image data, use the imported placeholder
-      setCurrentImageUrl(placeholderImage);
-    }
-
-    return () => {
-      if (url) URL.revokeObjectURL(url);
-    };
-  }, [currentIndex, lesson.lesson]);
-
-  // --- TTS LOGIC ---
-  useEffect(() => {
-    // Cancel any speech that might be ongoing from a previous slide
-    window.speechSynthesis.cancel();
-
-    if (isTtsEnabled && currentView === "scene" && currentItem.paragraph) {
-      const utterance = new SpeechSynthesisUtterance(currentItem.paragraph);
-      window.speechSynthesis.speak(utterance);
-    }
-
-    // Cleanup: stop speech when the component unmounts
-    return () => {
-      window.speechSynthesis.cancel();
-    };
-  }, [currentIndex, currentView, isTtsEnabled, currentItem.paragraph]);
-
-  // --- AUTOPLAY LOGIC ---
-  useEffect(() => {
-    // Clear any existing timer when dependencies change
-    if (autoPlayTimerRef.current) {
-      clearTimeout(autoPlayTimerRef.current);
-    }
-
-    if (isAutoPlayEnabled && currentView === "scene") {
-      autoPlayTimerRef.current = setTimeout(() => {
-        handleNext();
-      }, AUTO_PLAY_DELAY);
-    }
-
-    // Cleanup: clear the timer if the component unmounts or auto-play is turned off
-    return () => {
-      if (autoPlayTimerRef.current) {
-        clearTimeout(autoPlayTimerRef.current);
-      }
-    };
-  }, [currentIndex, currentView, isAutoPlayEnabled]);
-
-  const handleNext = () => {
+  // --- HANDLER FUNCTIONS (Second - Wrapped in useCallback) ---
+  const handleNext = useCallback(() => {
     if (currentIndex < lesson.lesson.length - 1) {
       setCurrentIndex((prev) => prev + 1);
     } else {
       setCurrentView("quiz");
     }
-  };
+  }, [currentIndex, lesson.lesson.length]);
 
   const handlePrev = () => {
     if (currentIndex > 0) {
@@ -94,33 +41,82 @@ const LessonPlayer = ({ lesson, onClose, onLessonRated }) => {
 
   const handleSubmitQuiz = () => {
     setSubmitted(true);
-    // Move to rating view after a short delay
     setTimeout(() => setCurrentView("rating"), 3000);
   };
 
   const handleRating = (rateValue) => {
     setRating(rateValue);
     onLessonRated(lesson.id, rateValue);
-    setTimeout(onClose, 1500); // Close after rating
+    setTimeout(onClose, 1500);
   };
 
-  const getScore = () =>
-    lesson.quiz.reduce(
-      (score, q, i) => (userAnswers[i] === q.answer ? score + 1 : score),
-      0
-    );
+  const getScore = useCallback(
+    () =>
+      lesson.quiz.reduce(
+        (score, q, i) => (userAnswers[i] === q.answer ? score + 1 : score),
+        0
+      ),
+    [lesson.quiz, userAnswers]
+  );
 
-  const handleKeyDown = (e) => {
-    if (e.key === "Escape") onClose();
-    if (e.key === "ArrowRight" && currentView === "scene") handleNext();
-    if (e.key === "ArrowLeft" && currentView === "scene") handlePrev();
-  };
+  // --- USE EFFECT HOOKS (Third) ---
 
+  // Image handling logic
   useEffect(() => {
+    let url = "";
+    const imageBlob = lesson.lesson[currentIndex]?.imageData;
+    if (imageBlob instanceof Blob) {
+      url = URL.createObjectURL(imageBlob);
+      setCurrentImageUrl(url);
+    } else {
+      setCurrentImageUrl(placeholderImage);
+    }
+    return () => {
+      if (url) URL.revokeObjectURL(url);
+    };
+  }, [currentIndex, lesson.lesson]);
+
+  // Robust TTS logic
+  useEffect(() => {
+    const synth = window.speechSynthesis;
+    const speak = () => {
+      if (isTtsEnabled && currentView === "scene" && currentItem.paragraph) {
+        if (synth.pending || synth.speaking) synth.cancel();
+        const utterance = new SpeechSynthesisUtterance(currentItem.paragraph);
+        synth.speak(utterance);
+      }
+    };
+    synth.cancel();
+    const speakTimeout = setTimeout(speak, 100);
+    return () => {
+      clearTimeout(speakTimeout);
+      if (synth) synth.cancel();
+    };
+  }, [currentIndex, currentView, isTtsEnabled, currentItem.paragraph]);
+
+  // Auto-play logic
+  useEffect(() => {
+    if (autoPlayTimerRef.current) clearTimeout(autoPlayTimerRef.current);
+    if (isAutoPlayEnabled && currentView === "scene") {
+      autoPlayTimerRef.current = setTimeout(handleNext, AUTO_PLAY_DELAY);
+    }
+    return () => {
+      if (autoPlayTimerRef.current) clearTimeout(autoPlayTimerRef.current);
+    };
+  }, [currentView, isAutoPlayEnabled, handleNext]); // handleNext is now stable thanks to useCallback
+
+  // Keyboard navigation logic
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === "Escape") onClose();
+      if (e.key === "ArrowRight" && currentView === "scene") handleNext();
+      if (e.key === "ArrowLeft" && currentView === "scene") handlePrev();
+    };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [currentIndex, currentView]);
+  }, [currentView, handleNext, onClose]); // handleNext is stable here too
 
+  // --- RENDER (Last) ---
   return (
     <div className="lesson-player-overlay">
       <div className="player-controls">
