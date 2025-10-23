@@ -220,8 +220,7 @@ const BrowseLessonsPage = () => {
           ))
         ) : (
           <p className="no-lessons-message">
-            No published lessons found. Click the Lesson Creator tab at the top
-            to make one!
+            No published lessons found. Go to the Lesson Creator to make one!
           </p>
         )}
       </div>
