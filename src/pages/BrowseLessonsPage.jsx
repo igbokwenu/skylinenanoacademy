@@ -6,9 +6,8 @@ import placeholderImage from "../assets/skyline_nano_academy.png";
 import LessonPlayer from "../components/LessonPlayer";
 import PrintableLesson from "../components/PrintableLesson";
 import "./BrowseLessonsPage.css";
-import { db } from "../lib/db"; // We will create this CSS file
+import { db } from "../lib/db";
 
-// These params should match those in LessonCreatorPage
 const lessonParams = {
   formats: ["Manga", "Storybook", "Comic Book", "Science Journal"],
   styles: ["Cartoon", "Photorealistic", "3D Animation", "Anime", "Watercolor"],
@@ -30,7 +29,8 @@ const BrowseLessonsPage = () => {
   const [lessons, setLessons] = useState([]);
   const [playingLesson, setPlayingLesson] = useState(null);
   const [lessonToPrint, setLessonToPrint] = useState(null);
-  const printComponentRef = useRef();
+  const printComponentRef = useRef(null); // Initialize ref with null
+
   const [filters, setFilters] = useState({
     format: "All",
     style: "All",
@@ -39,22 +39,17 @@ const BrowseLessonsPage = () => {
     perspective: "All",
   });
 
+  // 1. Configure useReactToPrint. It's now just a function we can call.
   const handlePrint = useReactToPrint({
     content: () => printComponentRef.current,
-    onAfterPrint: () => setLessonToPrint(null), // Clear the lesson after printing
+    onAfterPrint: () => setLessonToPrint(null),
+    removeAfterPrint: true,
   });
 
-  useEffect(() => {
+  // 2. This is the corrected and robust effect.
+  useLayoutEffect(() => {
     if (lessonToPrint) {
-      // Use a timeout to allow the PrintableLesson component to render before we print.
-      // A zero-delay timeout defers execution until the next event loop tick,
-      // which is after the current render cycle completes.
-      const timer = setTimeout(() => {
-        handlePrint();
-      }, 0);
-
-      // It's good practice to clean up the timer in case the component unmounts
-      return () => clearTimeout(timer);
+      handlePrint();
     }
   }, [lessonToPrint, handlePrint]);
 
@@ -69,15 +64,12 @@ const BrowseLessonsPage = () => {
     fetchLessons();
   }, []);
 
+  // ... (All other handlers like handleLessonRated, handleDeleteLesson, etc. are correct and do not need changes)
   const handleLessonRated = async (lessonId, rating) => {
-    // Get the existing lesson
     const lessonToUpdate = await db.lessons.get(lessonId);
     if (lessonToUpdate) {
-      // Add the new rating to the ratings array
       const newRatings = [...(lessonToUpdate.ratings || []), rating];
       await db.lessons.update(lessonId, { ratings: newRatings });
-
-      // Update local state immediately
       setLessons((prevLessons) =>
         prevLessons.map((lesson) =>
           lesson.id === lessonId ? { ...lesson, ratings: newRatings } : lesson
@@ -87,16 +79,12 @@ const BrowseLessonsPage = () => {
   };
 
   const handleDeleteLesson = async (lessonId) => {
-    // Show a confirmation dialog
     const isConfirmed = window.confirm(
       "Are you sure you want to delete this lesson? This action cannot be undone."
     );
-
     if (isConfirmed) {
       try {
-        // Delete from IndexedDB
         await db.lessons.delete(lessonId);
-        // Update state to remove the lesson from the UI
         setLessons((prevLessons) =>
           prevLessons.filter((lesson) => lesson.id !== lessonId)
         );
@@ -121,24 +109,18 @@ const BrowseLessonsPage = () => {
     });
   }, [lessons, filters]);
 
-  // A new component to handle converting Blob to Object URL
   const LessonCardImage = ({ imageData, title }) => {
     const [imageUrl, setImageUrl] = useState(placeholderImage);
-
     useEffect(() => {
       if (imageData instanceof Blob) {
         const url = URL.createObjectURL(imageData);
         setImageUrl(url);
-
-        // Clean up the object URL when the component unmounts to prevent memory leaks
         return () => URL.revokeObjectURL(url);
       }
     }, [imageData]);
-
     return <img src={imageUrl} alt={title} className="lesson-card-image" />;
   };
 
-  // Helper function to calculate average rating
   const calculateAverageRating = (ratings) => {
     if (!ratings || ratings.length === 0) {
       return "No ratings yet";
@@ -157,7 +139,7 @@ const BrowseLessonsPage = () => {
           onLessonRated={handleLessonRated}
         />
       )}
-      {/* --- HIDDEN COMPONENT FOR PRINTING --- */}
+
       <div className="hidden-for-print">
         {lessonToPrint && (
           <PrintableLesson ref={printComponentRef} lesson={lessonToPrint} />
@@ -165,11 +147,8 @@ const BrowseLessonsPage = () => {
       </div>
 
       <div className="bl-header">
-        <h3>
-          Browse Published LessonsExplore and play the lessons you've created
-          and saved locally.
-        </h3>
-        {/* <p>Explore and play the lessons you've created and saved locally.</p> */}
+        <h1>Browse Published Lessons</h1>
+        <p>Explore and play the lessons you've created and saved locally.</p>
       </div>
 
       <div className="bl-filters">
@@ -210,8 +189,6 @@ const BrowseLessonsPage = () => {
                   <span className="tag">{lesson.metadata.style}</span>
                   <span className="tag">{lesson.metadata.ageGroup}</span>
                 </div>
-
-                {/* --- CARD FOOTER WITH RATING AND ACTIONS --- */}
                 <div className="lesson-card-footer">
                   <div className="avg-rating">
                     <span className="star-icon">★</span>
