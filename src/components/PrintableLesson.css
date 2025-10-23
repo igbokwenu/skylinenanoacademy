@@ -1,95 +1,342 @@
 /* src/components/PrintableLesson.css */
 
-.printable-container {
-  font-family: Arial, sans-serif;
-  color: #333;
+/* ===== General Print Styles ===== */
+@media print {
+  html,
+  body {
+    height: 100%;
+    margin: 0;
+    padding: 0;
+    overflow: initial;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  @page {
+    size: letter portrait;
+    margin: 0;
+  }
 }
 
-.page {
-  width: 210mm; /* A4 width */
-  min-height: 297mm; /* A4 height */
-  padding: 20mm;
-  margin: 0 auto;
-  box-sizing: border-box;
-  page-break-after: always; /* Ensure each .page div is a new page when printing */
+.printable-container {
+  width: 100%;
   background: white;
 }
 
-.page:last-child {
-  page-break-after: avoid;
+.page {
+  width: 100%;
+  min-height: 100vh;
+  page-break-after: always;
+  page-break-inside: avoid;
+  position: relative;
+  box-sizing: border-box;
 }
 
-/* Cover Page Styles */
+/* ===== Cover Page Styles ===== */
 .cover-page {
   display: flex;
   flex-direction: column;
+  justify-content: center;
   align-items: center;
-  text-align: center;
-}
-.cover-image {
-  max-width: 80%;
-  max-height: 120mm;
-  object-fit: contain;
-  margin-bottom: 20px;
-}
-.cover-page h1 {
-  font-size: 28pt;
-  margin-bottom: 15px;
-}
-.blurb {
-  font-size: 14pt;
-  font-style: italic;
-  color: #555;
-  margin-bottom: 30px;
-}
-.metadata-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 10px 20px;
-  font-size: 12pt;
+  padding: 0;
+  margin: 0;
+  background: white;
+  position: relative;
+  overflow: hidden;
 }
 
-/* Scene Page Styles */
-.scene-page h2 {
-  font-size: 20pt;
-  border-bottom: 2px solid #ccc;
-  padding-bottom: 10px;
+.cover-image-wrapper {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 1;
 }
-.scene-image {
+
+.cover-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+}
+
+.cover-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(
+    to bottom,
+    rgba(0, 0, 0, 0.3) 0%,
+    rgba(0, 0, 0, 0.6) 100%
+  );
+}
+
+.cover-content {
+  position: relative;
+  z-index: 2;
+  width: 85%;
+  max-width: 600px;
+  text-align: center;
+  color: white;
+  padding: 40px;
+}
+
+.cover-title {
+  font-size: 48px;
+  font-weight: 800;
+  margin: 0 0 30px 0;
+  text-shadow: 3px 3px 8px rgba(0, 0, 0, 0.8);
+  line-height: 1.2;
+  color: white;
+}
+
+.blurb-box {
+  background: rgba(255, 255, 255, 0.95);
+  padding: 25px 30px;
+  border-radius: 16px;
+  margin: 30px 0 40px 0;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+}
+
+.blurb {
+  font-size: 18px;
+  line-height: 1.7;
+  color: #333;
+  margin: 0;
+  font-weight: 500;
+  text-align: left;
+}
+
+.metadata-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 15px;
+  margin-top: 30px;
+}
+
+.metadata-item {
+  background: rgba(255, 255, 255, 0.9);
+  padding: 15px 20px;
+  border-radius: 12px;
+  text-align: left;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+.metadata-label {
   display: block;
-  max-width: 100%;
-  max-height: 100mm;
-  object-fit: contain;
-  margin: 20px auto;
+  font-size: 12px;
+  font-weight: 700;
+  color: #667eea;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin-bottom: 5px;
 }
+
+.metadata-value {
+  display: block;
+  font-size: 16px;
+  font-weight: 600;
+  color: #333;
+}
+
+/* ===== Scene Page Styles ===== */
+.scene-page {
+  padding: 50px 60px;
+  background: white;
+  display: flex;
+  flex-direction: column;
+}
+
+.scene-header {
+  margin-bottom: 25px;
+  text-align: center;
+}
+
+.scene-number {
+  font-size: 32px;
+  font-weight: 700;
+  color: #667eea;
+  margin: 0;
+  padding-bottom: 10px;
+  border-bottom: 3px solid #667eea;
+  display: inline-block;
+}
+
+.scene-image-wrapper {
+  width: 100%;
+  margin: 25px 0;
+  display: flex;
+  justify-content: center;
+}
+
+.scene-image {
+  width: 100%;
+  max-width: 650px;
+  height: auto;
+  border-radius: 20px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+  border: 4px solid #f0f0f0;
+}
+
+.scene-text-wrapper {
+  margin-top: 30px;
+  padding: 25px 30px;
+  background: #f9fafb;
+  border-radius: 16px;
+  border-left: 5px solid #667eea;
+}
+
 .scene-paragraph {
-  font-size: 12pt;
+  font-size: 18px;
+  line-height: 1.9;
+  color: #2d3748;
+  margin: 0;
+  text-align: justify;
+  font-weight: 400;
+}
+
+/* ===== Quiz Page Styles ===== */
+.quiz-page {
+  padding: 50px 60px;
+  background: linear-gradient(to bottom, #f9fafb 0%, #ffffff 100%);
+}
+
+.quiz-header {
+  text-align: center;
+  margin-bottom: 40px;
+  padding-bottom: 25px;
+  border-bottom: 4px solid #667eea;
+}
+
+.quiz-title {
+  font-size: 42px;
+  font-weight: 800;
+  color: #667eea;
+  margin: 0 0 10px 0;
+}
+
+.quiz-subtitle {
+  font-size: 20px;
+  color: #718096;
+  margin: 0;
+  font-weight: 500;
+}
+
+.quiz-content {
+  display: flex;
+  flex-direction: column;
+  gap: 30px;
+}
+
+.quiz-item {
+  background: white;
+  padding: 25px 30px;
+  border-radius: 16px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  border: 2px solid #e2e8f0;
+  page-break-inside: avoid;
+}
+
+.question {
+  font-size: 20px;
+  color: #2d3748;
+  margin: 0 0 20px 0;
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  font-weight: 600;
   line-height: 1.6;
 }
 
-/* Quiz Page Styles */
-.quiz-page h2 {
-  font-size: 20pt;
-  margin-bottom: 20px;
-}
-.quiz-item {
-  margin-bottom: 25px;
-  font-size: 12pt;
-}
-.question {
-  margin-bottom: 10px;
-}
-.quiz-item ol {
-  padding-left: 30px;
-}
-.answer {
-  margin-top: 10px;
-  color: #006400; /* Dark green for answers */
+.question-number {
+  color: #667eea;
+  font-weight: 800;
+  font-size: 22px;
+  min-width: 35px;
 }
 
-/* This class will be used to hide the component from the screen view */
-.hidden-for-print {
+.question-text {
+  flex: 1;
+}
+
+.options-list {
+  margin: 20px 0;
+  padding-left: 0;
+  list-style: none;
+  counter-reset: option-counter;
+}
+
+.option-item {
+  counter-increment: option-counter;
+  margin: 12px 0;
+  padding: 15px 20px;
+  background: #f7fafc;
+  border-radius: 10px;
+  border: 2px solid #e2e8f0;
+  position: relative;
+  padding-left: 55px;
+  font-size: 17px;
+  line-height: 1.6;
+  color: #4a5568;
+  transition: all 0.2s;
+}
+
+.option-item::before {
+  content: counter(option-counter, upper-alpha) ".";
   position: absolute;
-  left: -9999px;
-  top: -9999px;
+  left: 20px;
+  font-weight: 700;
+  color: #667eea;
+  font-size: 18px;
+}
+
+.option-text {
+  display: block;
+}
+
+.answer-box {
+  margin-top: 20px;
+  padding: 15px 20px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border-radius: 10px;
+  color: white;
+  font-size: 17px;
+  font-weight: 600;
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+}
+
+.answer-box strong {
+  font-weight: 800;
+  margin-right: 8px;
+}
+
+/* ===== Print-Specific Adjustments ===== */
+@media print {
+  .cover-page {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .scene-image,
+  .cover-image {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .quiz-item {
+    page-break-inside: avoid;
+  }
+
+  .answer-box {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .metadata-item {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
 }
