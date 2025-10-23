@@ -164,11 +164,39 @@
   font-size: 1.2em;
 }
 
-
 .no-lessons-message {
   grid-column: 1 / -1;
   text-align: center;
   font-size: 1.2em;
   color: #777;
   margin-top: 40px;
+}
+.card-actions {
+  display: grid; /* Use grid for three equal columns */
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.play-btn,
+.delete-btn,
+.print-btn {
+  width: 100%; /* Ensure buttons fill their grid cell */
+  padding: 10px 5px; /* Adjust padding for smaller buttons */
+  font-size: 0.9em;
+  font-weight: bold;
+}
+
+.print-btn {
+  background-color: #0c64e4;
+}
+.print-btn:hover {
+  background-color: #0a58d1;
+}
+
+.hidden-for-print {
+  position: absolute;
+  left: -9999px;
+  top: -9999px;
+  z-index: -1;
 }

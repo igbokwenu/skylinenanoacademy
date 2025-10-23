@@ -83,6 +83,10 @@ const LessonPlayer = ({ lesson, onClose, onLessonRated }) => {
       if (isTtsEnabled && currentView === "scene" && currentItem.paragraph) {
         if (synth.pending || synth.speaking) synth.cancel();
         const utterance = new SpeechSynthesisUtterance(currentItem.paragraph);
+
+        // --- SPEED CONTROL ---
+        utterance.rate = 0.8; // Set playback speed. 1 is default, 0.8 is 80% speed.
+
         synth.speak(utterance);
       }
     };

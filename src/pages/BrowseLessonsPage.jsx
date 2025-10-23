@@ -1,8 +1,10 @@
 // src/pages/BrowseLessonsPage.jsx
 
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
+import { useReactToPrint } from "react-to-print";
 import placeholderImage from "../assets/skyline_nano_academy.png";
-import LessonPlayer from "../components/LessonPlayer"; // We will create this next
+import LessonPlayer from "../components/LessonPlayer";
+import PrintableLesson from "../components/PrintableLesson";
 import "./BrowseLessonsPage.css";
 import { db } from "../lib/db"; // We will create this CSS file
 
@@ -27,6 +29,8 @@ const lessonParams = {
 const BrowseLessonsPage = () => {
   const [lessons, setLessons] = useState([]);
   const [playingLesson, setPlayingLesson] = useState(null);
+  const [lessonToPrint, setLessonToPrint] = useState(null);
+  const printComponentRef = useRef();
   const [filters, setFilters] = useState({
     format: "All",
     style: "All",
@@ -34,6 +38,25 @@ const BrowseLessonsPage = () => {
     ageGroup: "All",
     perspective: "All",
   });
+
+  const handlePrint = useReactToPrint({
+    content: () => printComponentRef.current,
+    onAfterPrint: () => setLessonToPrint(null), // Clear the lesson after printing
+  });
+
+  useEffect(() => {
+    if (lessonToPrint) {
+      // Use a timeout to allow the PrintableLesson component to render before we print.
+      // A zero-delay timeout defers execution until the next event loop tick,
+      // which is after the current render cycle completes.
+      const timer = setTimeout(() => {
+        handlePrint();
+      }, 0);
+
+      // It's good practice to clean up the timer in case the component unmounts
+      return () => clearTimeout(timer);
+    }
+  }, [lessonToPrint, handlePrint]);
 
   useEffect(() => {
     const fetchLessons = async () => {
@@ -134,6 +157,12 @@ const BrowseLessonsPage = () => {
           onLessonRated={handleLessonRated}
         />
       )}
+      {/* --- HIDDEN COMPONENT FOR PRINTING --- */}
+      <div className="hidden-for-print">
+        {lessonToPrint && (
+          <PrintableLesson ref={printComponentRef} lesson={lessonToPrint} />
+        )}
+      </div>
 
       <div className="bl-header">
         <h3>
@@ -194,6 +223,12 @@ const BrowseLessonsPage = () => {
                       onClick={() => setPlayingLesson(lesson)}
                     >
                       Play
+                    </button>
+                    <button
+                      className="print-btn"
+                      onClick={() => setLessonToPrint(lesson)}
+                    >
+                      Print
                     </button>
                     <button
                       className="delete-btn"
