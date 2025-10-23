@@ -791,3 +791,17 @@ button:hover {
   background-color: #aaa;
   cursor: not-allowed;
 }
+
+.manual-upload-btn {
+  display: inline-block;
+  background-color: #0c64e4;
+  color: white;
+  padding: 10px 15px;
+  border-radius: 6px;
+  cursor: pointer;
+  text-align: center;
+  margin-top: 15px;
+}
+.manual-upload-btn:hover {
+  background-color: #0a58d1;
+}

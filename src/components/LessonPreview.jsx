@@ -39,20 +39,116 @@ const LessonPreview = ({ lesson, lessonSettings, onClose }) => {
   const [isRewritePopupVisible, setIsRewritePopupVisible] = useState(false);
   const [selectionRange, setSelectionRange] = useState(null);
   const [popupPosition, setPopupPosition] = useState({ top: 0, left: 0 });
+  const [imageObjectURLs, setImageObjectURLs] = useState({});
+  const [isPublishing, setIsPublishing] = useState(false);
+  const [publishStatus, setPublishStatus] = useState("");
+
   const { isLoading: isRewriting, executePrompt: executeRewrite } =
     useLanguageModel({ apiName: "Rewriter" });
   const [isProofreading, setIsProofreading] = useState(false);
-  const currentScene = editableLesson.lesson[currentSceneIndex];
-  const totalScenes = editableLesson.lesson.length;
-  const totalQuestions = editableLesson.quiz.length;
-  const [isPublishing, setIsPublishing] = useState(false);
-  const [publishStatus, setPublishStatus] = useState("");
-  // Hook for the summarizer API
   const { getMonitor } = useMonitorDownload();
   const { executePrompt: executeSummarize } = useLanguageModel({
     apiName: "Summarizer",
   });
 
+  const currentScene = editableLesson.lesson[currentSceneIndex];
+  const totalScenes = editableLesson.lesson.length;
+  const totalQuestions = editableLesson.quiz.length;
+
+  // --- HANDLERS ---
+
+  const handleManualImageUpload = (e, sceneId) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setEditableLesson((prev) => ({
+      ...prev,
+      lesson: prev.lesson.map((scene) =>
+        scene.scene === sceneId ? { ...scene, imageData: file } : scene
+      ),
+    }));
+
+    const url = URL.createObjectURL(file);
+    setImageObjectURLs((prev) => ({ ...prev, [sceneId]: url }));
+  };
+
+  const handlePublish = async () => {
+    setIsPublishing(true);
+    setPublishStatus("Summarizing lesson content...");
+
+    const lessonContent = lesson.lesson.map((p) => p.paragraph).join("\n");
+    const fullText = `${lesson.title}\n${lessonContent}`;
+    const summarizerPrompt = `Based on the following lesson content, create a compelling hook or blurb, like one you'd see on the back of a book or for a movie trailer. It must be exciting and spark curiosity. **Crucially, the entire blurb must be a maximum of 70 words.** Here is the content:\n\n${fullText}`;
+
+    const blurb = await executeSummarize(summarizerPrompt, {}, getMonitor());
+    if (!blurb) {
+      setPublishStatus("Failed to create summary. Cannot publish.");
+      setTimeout(() => setIsPublishing(false), 3000);
+      return;
+    }
+
+    const sanitizedBlurb = blurb.replace(/[*#]/g, "").trim();
+    setPublishStatus("Preparing lesson for saving...");
+
+    const lessonWithBlobs = {
+      ...editableLesson, // Use the potentially modified lesson
+      lesson: editableLesson.lesson.map((scene) => {
+        let finalImageData = null;
+        if (scene.imageData) {
+          if (typeof scene.imageData === "string") {
+            finalImageData = base64ToBlob(scene.imageData);
+          } else {
+            finalImageData = scene.imageData; // Already a File/Blob
+          }
+        }
+        return { ...scene, imageData: finalImageData };
+      }),
+    };
+
+    const newPublishedLesson = {
+      title: lessonWithBlobs.title,
+      blurb: sanitizedBlurb,
+      lesson: lessonWithBlobs.lesson,
+      quiz: lessonWithBlobs.quiz,
+      metadata: { ...lessonSettings },
+      ratings: [],
+      createdAt: new Date(),
+    };
+
+    setPublishStatus("Saving lesson to the database...");
+    try {
+      await db.lessons.add(newPublishedLesson);
+      setPublishStatus("Lesson Published Successfully!");
+    } catch (error) {
+      console.error("Failed to save lesson to IndexedDB:", error);
+      setPublishStatus(`Error saving lesson: ${error.message}`);
+    } finally {
+      setTimeout(() => {
+        setIsPublishing(false);
+        onClose();
+      }, 2000);
+    }
+  };
+
+  useEffect(() => {
+    // Cleanup object URLs on unmount
+    return () => {
+      Object.values(imageObjectURLs).forEach(URL.revokeObjectURL);
+    };
+  }, [imageObjectURLs]);
+
+  // --- DERIVED STATE FOR RENDERING ---
+
+  let imagePreviewSrc = placeholderImage;
+  if (currentScene.imageData) {
+    if (imageObjectURLs[currentScene.scene]) {
+      imagePreviewSrc = imageObjectURLs[currentScene.scene];
+    } else if (typeof currentScene.imageData === "string") {
+      imagePreviewSrc = `data:image/png;base64,${currentScene.imageData}`;
+    }
+  }
+
+  // ... (All other handlers like handleNext, handlePrev, handleEdit, etc., remain the same as your existing code)
   const handleNext = () => {
     if (currentSceneIndex < totalScenes - 1) {
       setCurrentSceneIndex((prev) => prev + 1);
@@ -60,7 +156,6 @@ const LessonPreview = ({ lesson, lessonSettings, onClose }) => {
       setShowQuiz(true);
     }
   };
-
   const handlePrev = () => {
     if (showQuiz) {
       setShowQuiz(false);
@@ -68,11 +163,9 @@ const LessonPreview = ({ lesson, lessonSettings, onClose }) => {
       setCurrentSceneIndex((prev) => prev - 1);
     }
   };
-
   const handleAnswerSelect = (qIndex, option) => {
     setUserAnswers((prev) => ({ ...prev, [qIndex]: option }));
   };
-
   const handleSubmitQuiz = () => {
     if (Object.keys(userAnswers).length !== totalQuestions) {
       alert("Please answer all questions first.");
@@ -80,7 +173,6 @@ const LessonPreview = ({ lesson, lessonSettings, onClose }) => {
       setSubmitted(true);
     }
   };
-
   useEffect(() => {
     const handleKeyDown = (e) => {
       if (e.key === "Escape") onClose();
@@ -88,24 +180,20 @@ const LessonPreview = ({ lesson, lessonSettings, onClose }) => {
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [onClose]);
-
   const getScore = () => {
     return editableLesson.quiz.reduce((score, question, index) => {
       return userAnswers[index] === question.answer ? score + 1 : score;
     }, 0);
   };
-
   const handleEdit = (sceneId) => {
     setEditingSceneId(sceneId);
     setFeedback("");
   };
-
   const handleCancelEdit = () => {
     setEditingSceneId(null);
     setEditableLesson(JSON.parse(JSON.stringify(lesson)));
     setFeedback("");
   };
-
   const handleSceneTextChange = (sceneId, field, value) => {
     setEditableLesson((prev) => ({
       ...prev,
@@ -114,7 +202,6 @@ const LessonPreview = ({ lesson, lessonSettings, onClose }) => {
       ),
     }));
   };
-
   const handleSelection = (e, field) => {
     const textarea = e.target;
     const start = textarea.selectionStart;
@@ -124,23 +211,18 @@ const LessonPreview = ({ lesson, lessonSettings, onClose }) => {
       setSelectedText(text);
       setSelectionRange({ start, end, field });
       setIsRewritePopupVisible(true);
-
       const rect = textarea.getBoundingClientRect();
       const popupTop = e.clientY - rect.top;
       const popupLeft = e.clientX - rect.left;
-
       setPopupPosition({ top: popupTop, left: popupLeft });
     }
   };
-
   const handleRewriteSelection = async () => {
     if (!selectedText || !selectionRange) return;
-
     setFeedback("Rewriting selection...");
     const rewrittenText = await executeRewrite(selectedText, {
       context: selectionRewritePrompt,
     });
-
     if (rewrittenText) {
       const { start, end, field } = selectionRange;
       const originalText = currentScene[field];
@@ -148,34 +230,28 @@ const LessonPreview = ({ lesson, lessonSettings, onClose }) => {
         originalText.substring(0, start) +
         rewrittenText +
         originalText.substring(end);
-
       handleSceneTextChange(currentScene.scene, field, newText);
       setFeedback("Selection rewritten successfully!");
     } else {
       setFeedback("Failed to rewrite the selection.");
     }
-
     setIsRewritePopupVisible(false);
     setSelectionRewritePrompt("");
     setSelectedText("");
     setSelectionRange(null);
   };
-
   const handleRewrite = async (sceneId) => {
     setFeedback("Rewriting scene...");
     const scene = editableLesson.lesson.find((s) => s.scene === sceneId);
     const rewrittenParagraph = await executeRewrite(scene.paragraph, {
       context: rewritePrompt,
     });
-
     if (rewrittenParagraph) {
       handleSceneTextChange(sceneId, "paragraph", rewrittenParagraph);
       setFeedback("Scene rewritten. Now rewriting image prompt...");
-
       const rewrittenImagePrompt = await executeRewrite(rewrittenParagraph, {
         context: "Rewrite this paragraph into a descriptive image prompt.",
       });
-
       if (rewrittenImagePrompt) {
         handleSceneTextChange(sceneId, "image_prompt", rewrittenImagePrompt);
         setFeedback("Scene and image prompt rewritten successfully!");
@@ -186,17 +262,14 @@ const LessonPreview = ({ lesson, lessonSettings, onClose }) => {
       setFeedback("Failed to rewrite the scene.");
     }
   };
-
   const handleProofreadAndSave = async (sceneId) => {
     setIsProofreading(true);
     setFeedback("Proofreading...");
     const scene = editableLesson.lesson.find((s) => s.scene === sceneId);
-
     try {
       const proofreader = await self.Proofreader.create();
       const paragraphResult = await proofreader.proofread(scene.paragraph);
       const imagePromptResult = await proofreader.proofread(scene.image_prompt);
-
       if (
         (paragraphResult.corrections &&
           paragraphResult.corrections.length > 0) ||
@@ -217,22 +290,15 @@ const LessonPreview = ({ lesson, lessonSettings, onClose }) => {
       setIsProofreading(false);
     }
   };
-
   const handleAcceptCorrection = () => {
     const { paragraphResult, imagePromptResult } = proofreadResult;
-
     const newParagraph = paragraphResult.correctedInput;
     const newImagePrompt = imagePromptResult.correctedInput;
-
     setEditableLesson((prev) => ({
       ...prev,
       lesson: prev.lesson.map((scene) =>
         scene.scene === editingSceneId
-          ? {
-              ...scene,
-              paragraph: newParagraph,
-              image_prompt: newImagePrompt,
-            }
+          ? { ...scene, paragraph: newParagraph, image_prompt: newImagePrompt }
           : scene
       ),
     }));
@@ -240,35 +306,29 @@ const LessonPreview = ({ lesson, lessonSettings, onClose }) => {
     setEditingSceneId(null);
     setFeedback("Corrections applied and changes saved.");
   };
-
   const handleIgnoreCorrection = () => {
     setProofreadResult(null);
     setEditingSceneId(null);
     setFeedback("Corrections ignored. Changes saved.");
   };
-
   const handleCloseProofreadModal = () => {
     setProofreadResult(null);
-    // Don't reset editingSceneId, so the user can continue editing.
   };
-
   const renderHighlightedText = (text, corrections) => {
     if (!corrections || corrections.length === 0) {
       return <p>{text}</p>;
     }
-
     const sortedCorrections = [...corrections].sort(
       (a, b) => a.startIndex - b.startIndex
     );
-
     let lastIndex = 0;
     const highlightedElements = [];
-
     sortedCorrections.forEach((correction) => {
       if (correction.startIndex > lastIndex) {
         highlightedElements.push(
           <span key={`text-${lastIndex}`}>
-            {text.substring(lastIndex, correction.startIndex)}
+            {" "}
+            {text.substring(lastIndex, correction.startIndex)}{" "}
           </span>
         );
       }
@@ -278,85 +338,24 @@ const LessonPreview = ({ lesson, lessonSettings, onClose }) => {
       );
       highlightedElements.push(
         <span key={`err-${correction.startIndex}`} className="error-highlight">
-          {incorrectText}
+          {" "}
+          {incorrectText}{" "}
         </span>
       );
       lastIndex = correction.endIndex;
     });
-
     if (lastIndex < text.length) {
       highlightedElements.push(
         <span key="text-end">{text.substring(lastIndex)}</span>
       );
     }
-
     return <p>{highlightedElements}</p>;
-  };
-
-  const handlePublish = async () => {
-    setIsPublishing(true);
-    setPublishStatus("Summarizing lesson content...");
-
-    // 1. Concatenate all text content for the summarizer
-    const lessonContent = lesson.lesson.map((p) => p.paragraph).join("\n");
-    const fullText = `${lesson.title}\n${lessonContent}`;
-
-    // --- PROMPT ENHANCEMENT ---
-    // Create a more specific prompt for the summarizer API
-    const summarizerPrompt = `Based on the following lesson content, create a compelling hook or blurb, like one you'd see on the back of a book or for a movie trailer. It must be exciting and spark curiosity. **Crucially, the entire blurb must be a maximum of 70 words.** Here is the content:\n\n${fullText}`;
-
-    // 2. Execute the enhanced summarizer prompt
-    const blurb = await executeSummarize(summarizerPrompt, {}, getMonitor());
-
-    if (!blurb) {
-      setPublishStatus("Failed to create summary. Cannot publish.");
-      setTimeout(() => setIsPublishing(false), 3000);
-      return;
-    }
-
-    // Remove any asterisks or hashes and trim whitespace.
-    const sanitizedBlurb = blurb.replace(/[*#]/g, "").trim();
-
-    setPublishStatus("Preparing lesson for saving...");
-
-    // Convert base64 image data to Blobs for efficient storage
-    const lessonWithBlobs = {
-      ...lesson,
-      lesson: lesson.lesson.map((scene) => ({
-        ...scene,
-        imageData: scene.imageData ? base64ToBlob(scene.imageData) : null,
-      })),
-    };
-
-    // Construct the final object, initializing ratings as an empty array
-    const newPublishedLesson = {
-      title: lessonWithBlobs.title,
-      blurb: sanitizedBlurb,
-      lesson: lessonWithBlobs.lesson,
-      quiz: lessonWithBlobs.quiz,
-      metadata: { ...lessonSettings },
-      ratings: [], // Initialize ratings as an empty array instead of `rating: null`
-      createdAt: new Date(),
-    };
-
-    setPublishStatus("Saving lesson to the database...");
-    try {
-      await db.lessons.add(newPublishedLesson);
-      setPublishStatus("Lesson Published Successfully!");
-    } catch (error) {
-      console.error("Failed to save lesson to IndexedDB:", error);
-      setPublishStatus(`Error saving lesson: ${error.message}`);
-    } finally {
-      setTimeout(() => {
-        setIsPublishing(false);
-        onClose();
-      }, 2000);
-    }
   };
 
   return (
     <div className="lesson-preview-overlay">
       <div className="lesson-preview-modal">
+        {/* Header is unchanged */}
         <button className="close-btn" onClick={onClose}>
           &times;
         </button>
@@ -374,110 +373,138 @@ const LessonPreview = ({ lesson, lessonSettings, onClose }) => {
           {!showQuiz ? (
             <div className="scene-content">
               {editingSceneId === currentScene.scene ? (
-                <div className="scene-editor">
-                  <div className="editor-main-content">
-                    <div className="edit-field">
-                      <label>Paragraph</label>
-                      <textarea
-                        value={currentScene.paragraph}
-                        onSelect={(e) => handleSelection(e, "paragraph")}
-                        onChange={(e) =>
-                          handleSceneTextChange(
-                            currentScene.scene,
-                            "paragraph",
-                            e.target.value
-                          )
-                        }
-                        rows={10}
-                      />
-                    </div>
-                    <div className="edit-field">
-                      <label>Image Prompt</label>
-                      <textarea
-                        value={currentScene.image_prompt}
-                        onSelect={(e) => handleSelection(e, "image_prompt")}
-                        onChange={(e) =>
-                          handleSceneTextChange(
-                            currentScene.scene,
-                            "image_prompt",
-                            e.target.value
-                          )
-                        }
-                        rows={5}
-                      />
-                    </div>
-                  </div>
-                  {isRewritePopupVisible && (
-                    <div
-                      className="rewrite-popup"
-                      style={{
-                        top: popupPosition.top,
-                        left: popupPosition.left,
-                      }}
-                    >
-                      <textarea
-                        value={selectionRewritePrompt}
-                        onChange={(e) =>
-                          setSelectionRewritePrompt(e.target.value)
-                        }
-                        placeholder="e.g., Make this part more playful..."
-                        rows={3}
-                      />
-                      <div className="rewrite-popup-actions">
-                        <button onClick={handleRewriteSelection}>
-                          Rewrite
-                        </button>
-                        <button onClick={() => setIsRewritePopupVisible(false)}>
-                          Close
-                        </button>
-                      </div>
-                    </div>
-                  )}
-                  <div className="editor-sidebar">
-                    <div className="rewrite-section">
-                      <label>Rewrite Prompt</label>
-                      <textarea
-                        value={rewritePrompt}
-                        onChange={(e) => setRewritePrompt(e.target.value)}
-                        placeholder="e.g., Make the scene more dramatic and change the setting to a rainy night."
-                        rows={4}
-                      />
-                    </div>
-                    <div className="edit-actions">
-                      <button
-                        onClick={() => handleRewrite(currentScene.scene)}
-                        disabled={isRewriting}
-                        className="btn-rewrite"
-                      >
-                        {isRewriting ? "Rewriting..." : "Rewrite Scene"}
-                      </button>
-                      <button
-                        onClick={() =>
-                          handleProofreadAndSave(currentScene.scene)
-                        }
-                        disabled={isProofreading}
-                        className="btn-save"
-                      >
-                        {isProofreading ? "Saving..." : "Save Changes"}
-                      </button>
-                      <button onClick={handleCancelEdit} className="btn-cancel">
-                        Cancel
-                      </button>
-                    </div>
-                    {feedback && (
-                      <div className="editor-feedback-box">{feedback}</div>
-                    )}
-                  </div>
-                </div>
-              ) : (
+                // --- THIS IS THE MODIFIED EDITING VIEW ---
                 <>
                   <div className="image-container">
                     <img
-                      src={
-                        currentScene.imageData
-                          ? `data:image/png;base64,${currentScene.imageData}`
-                          : placeholderImage
+                      src={imagePreviewSrc}
+                      alt={`Scene ${currentScene.scene}`}
+                    />
+                    <label
+                      htmlFor="manual-upload"
+                      className="manual-upload-btn"
+                    >
+                      Upload Your Image
+                    </label>
+                    <input
+                      id="manual-upload"
+                      type="file"
+                      accept="image/*"
+                      style={{ display: "none" }}
+                      onChange={(e) =>
+                        handleManualImageUpload(e, currentScene.scene)
                       }
+                    />
+                  </div>
+                  <div className="scene-editor">
+                    <div className="editor-main-content">
+                      <div className="edit-field">
+                        <label>Paragraph</label>
+                        <textarea
+                          value={currentScene.paragraph}
+                          onSelect={(e) => handleSelection(e, "paragraph")}
+                          onChange={(e) =>
+                            handleSceneTextChange(
+                              currentScene.scene,
+                              "paragraph",
+                              e.target.value
+                            )
+                          }
+                          rows={10}
+                        />
+                      </div>
+                      <div className="edit-field">
+                        <label>Image Prompt</label>
+                        <textarea
+                          value={currentScene.image_prompt}
+                          onSelect={(e) => handleSelection(e, "image_prompt")}
+                          onChange={(e) =>
+                            handleSceneTextChange(
+                              currentScene.scene,
+                              "image_prompt",
+                              e.target.value
+                            )
+                          }
+                          rows={5}
+                        />
+                      </div>
+                    </div>
+                    {isRewritePopupVisible && (
+                      <div
+                        className="rewrite-popup"
+                        style={{
+                          top: popupPosition.top,
+                          left: popupPosition.left,
+                        }}
+                      >
+                        {" "}
+                        <textarea
+                          value={selectionRewritePrompt}
+                          onChange={(e) =>
+                            setSelectionRewritePrompt(e.target.value)
+                          }
+                          placeholder="e.g., Make this part more playful..."
+                          rows={3}
+                        />{" "}
+                        <div className="rewrite-popup-actions">
+                          {" "}
+                          <button onClick={handleRewriteSelection}>
+                            Rewrite
+                          </button>{" "}
+                          <button
+                            onClick={() => setIsRewritePopupVisible(false)}
+                          >
+                            Close
+                          </button>{" "}
+                        </div>{" "}
+                      </div>
+                    )}
+                    <div className="editor-sidebar">
+                      <div className="rewrite-section">
+                        <label>Rewrite Prompt</label>
+                        <textarea
+                          value={rewritePrompt}
+                          onChange={(e) => setRewritePrompt(e.target.value)}
+                          placeholder="e.g., Make the scene more dramatic and change the setting to a rainy night."
+                          rows={4}
+                        />
+                      </div>
+                      <div className="edit-actions">
+                        <button
+                          onClick={() => handleRewrite(currentScene.scene)}
+                          disabled={isRewriting}
+                          className="btn-rewrite"
+                        >
+                          {isRewriting ? "Rewriting..." : "Rewrite Scene"}
+                        </button>
+                        <button
+                          onClick={() =>
+                            handleProofreadAndSave(currentScene.scene)
+                          }
+                          disabled={isProofreading}
+                          className="btn-save"
+                        >
+                          {isProofreading ? "Saving..." : "Save Changes"}
+                        </button>
+                        <button
+                          onClick={handleCancelEdit}
+                          className="btn-cancel"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                      {feedback && (
+                        <div className="editor-feedback-box">{feedback}</div>
+                      )}
+                    </div>
+                  </div>
+                </>
+              ) : (
+                // --- THIS IS THE MODIFIED NORMAL VIEW ---
+                <>
+                  <div className="image-container">
+                    <img
+                      src={imagePreviewSrc}
                       alt={`Scene ${currentScene.scene}`}
                     />
                     <p className="image-prompt-caption">
@@ -495,6 +522,7 @@ const LessonPreview = ({ lesson, lessonSettings, onClose }) => {
               )}
             </div>
           ) : (
+            // Quiz content is unchanged
             <div className="quiz-content">
               <h3>Test Your Knowledge!</h3>
               {submitted && (
@@ -504,12 +532,15 @@ const LessonPreview = ({ lesson, lessonSettings, onClose }) => {
               )}
               {editableLesson.quiz.map((q, index) => (
                 <div key={index} className="quiz-question">
+                  {" "}
                   <p>
+                    {" "}
                     <strong className="quiz-question-text">
                       {index + 1}. {q.question}
-                    </strong>
-                  </p>
+                    </strong>{" "}
+                  </p>{" "}
                   <div className="options-container">
+                    {" "}
                     {q.options.map((opt) => {
                       let className = "option-btn";
                       if (submitted) {
@@ -528,11 +559,12 @@ const LessonPreview = ({ lesson, lessonSettings, onClose }) => {
                           }
                           disabled={submitted}
                         >
-                          {opt}
+                          {" "}
+                          {opt}{" "}
                         </button>
                       );
-                    })}
-                  </div>
+                    })}{" "}
+                  </div>{" "}
                 </div>
               ))}
               {!submitted && (
@@ -542,20 +574,24 @@ const LessonPreview = ({ lesson, lessonSettings, onClose }) => {
               )}
             </div>
           )}
+
+          {/* Publish section is unchanged */}
           {showQuiz && submitted && (
             <div className="publish-section">
-              <h3>Publish Your Lesson</h3>
+              {" "}
+              <h3>Publish Your Lesson</h3>{" "}
               <p>
                 Save this lesson to your browser to play it anytime from the
                 "Browse Lessons" page.
-              </p>
+              </p>{" "}
               <button onClick={handlePublish} disabled={isPublishing}>
                 {isPublishing ? publishStatus : "Publish Lesson"}
-              </button>
+              </button>{" "}
             </div>
           )}
         </main>
 
+        {/* Footer is unchanged */}
         <footer>
           {(currentSceneIndex > 0 || showQuiz) && (
             <button onClick={handlePrev}>&larr; Previous</button>
@@ -571,73 +607,85 @@ const LessonPreview = ({ lesson, lessonSettings, onClose }) => {
             ))}
         </footer>
 
+        {/* Proofread modal is unchanged */}
         {proofreadResult && (
           <div className="proofread-modal">
-            <h3>Proofreader Suggestions</h3>
+            {" "}
+            <h3>Proofreader Suggestions</h3>{" "}
             <div className="proofread-content">
+              {" "}
               {proofreadResult.paragraphResult.corrections.length > 0 && (
                 <>
-                  <h4>Paragraph</h4>
+                  {" "}
+                  <h4>Paragraph</h4>{" "}
                   {renderHighlightedText(
                     editableLesson.lesson.find(
                       (s) => s.scene === editingSceneId
                     ).paragraph,
                     proofreadResult.paragraphResult.corrections
-                  )}
-                  <h5>Suggestions:</h5>
+                  )}{" "}
+                  <h5>Suggestions:</h5>{" "}
                   <ul>
+                    {" "}
                     {proofreadResult.paragraphResult.corrections.map((c, i) => (
                       <li key={`p-${i}`}>
+                        {" "}
                         "
                         <span className="error-highlight">
                           {editableLesson.lesson
                             .find((s) => s.scene === editingSceneId)
                             .paragraph.substring(c.startIndex, c.endIndex)}
                         </span>
-                        " should be "<strong>{c.correction}</strong>"
+                        " should be "<strong>{c.correction}</strong>"{" "}
                       </li>
-                    ))}
-                  </ul>
+                    ))}{" "}
+                  </ul>{" "}
                 </>
-              )}
+              )}{" "}
               {proofreadResult.imagePromptResult.corrections.length > 0 && (
                 <>
-                  <h4>Image Prompt</h4>
+                  {" "}
+                  <h4>Image Prompt</h4>{" "}
                   {renderHighlightedText(
                     editableLesson.lesson.find(
                       (s) => s.scene === editingSceneId
                     ).image_prompt,
                     proofreadResult.imagePromptResult.corrections
-                  )}
-                  <h5>Suggestions:</h5>
+                  )}{" "}
+                  <h5>Suggestions:</h5>{" "}
                   <ul>
+                    {" "}
                     {proofreadResult.imagePromptResult.corrections.map(
                       (c, i) => (
                         <li key={`ip-${i}`}>
+                          {" "}
                           "
                           <span className="error-highlight">
                             {editableLesson.lesson
                               .find((s) => s.scene === editingSceneId)
                               .image_prompt.substring(c.startIndex, c.endIndex)}
                           </span>
-                          " should be "<strong>{c.correction}</strong>"
+                          " should be "<strong>{c.correction}</strong>"{" "}
                         </li>
                       )
-                    )}
-                  </ul>
+                    )}{" "}
+                  </ul>{" "}
                 </>
-              )}
-            </div>
+              )}{" "}
+            </div>{" "}
             <div className="proofread-actions">
-              <button onClick={handleAcceptCorrection}>Accept Changes</button>
-              <button onClick={handleIgnoreCorrection}>Ignore and Save</button>
+              {" "}
+              <button onClick={handleAcceptCorrection}>
+                Accept Changes
+              </button>{" "}
+              <button onClick={handleIgnoreCorrection}>Ignore and Save</button>{" "}
               <button
                 onClick={handleCloseProofreadModal}
                 className="btn-cancel"
               >
                 Close
-              </button>
-            </div>
+              </button>{" "}
+            </div>{" "}
           </div>
         )}
       </div>
