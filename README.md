@@ -20,5 +20,9 @@ firebase deploy --only hosting
 //Deploying the app this command will run a script that builds the app and deploys it to Firebase Hosting:
 npm run deploy
 
+//Uninstall flutter gemini cli extension:
+$ gemini extensions uninstall https://github.com/gemini-cli-extensions/flutter
+
+
 
 Give me a robust implementation and just show me the parts of the code I need to change to implement this with the full code to replace it with some sort of start here, finish here marker.
