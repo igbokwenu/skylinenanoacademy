@@ -1,6 +1,6 @@
 // src/components/LessonPreview.jsx
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import placeholderImage from "../assets/skyline_nano_academy.png";
 import { useLanguageModel } from "../hooks/useLanguageModel";
 import { useMonitorDownload } from "../hooks/useMonitorDownload";
@@ -42,6 +42,9 @@ const LessonPreview = ({ lesson, lessonSettings, onClose }) => {
   const [imageObjectURLs, setImageObjectURLs] = useState({});
   const [isPublishing, setIsPublishing] = useState(false);
   const [publishStatus, setPublishStatus] = useState("");
+
+  const imageObjectURLsRef = useRef(imageObjectURLs);
+  imageObjectURLsRef.current = imageObjectURLs;
 
   const { isLoading: isRewriting, executePrompt: executeRewrite } =
     useLanguageModel({ apiName: "Rewriter" });
@@ -133,9 +136,9 @@ const LessonPreview = ({ lesson, lessonSettings, onClose }) => {
   useEffect(() => {
     // Cleanup object URLs on unmount
     return () => {
-      Object.values(imageObjectURLs).forEach(URL.revokeObjectURL);
+      Object.values(imageObjectURLsRef.current).forEach(URL.revokeObjectURL);
     };
-  }, [imageObjectURLs]);
+  }, []);
 
   // --- DERIVED STATE FOR RENDERING ---
 
