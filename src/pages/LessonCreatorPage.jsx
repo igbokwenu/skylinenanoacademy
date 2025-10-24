@@ -352,32 +352,41 @@ const LessonCreatorPage = () => {
 
         if (isImmersiveDirect && characterImage) {
           // Immersive mode with a direct image: Focus on transferring facial likeness.
-          textPrompt = `Depict a character with the facial features and likeness of the person in the provided image. The character is ${scene.image_prompt}. Ensure the character is portrayed as ${ageDescription}. The overall style should be ${settings.style}.`;
+          textPrompt = `The main character is named ${
+            settings.studentName || "the student"
+          }. If the main character appears in the following scene, they MUST have the facial features and likeness of the person in the provided image. The scene is: \"${
+            scene.image_prompt
+          }\". Ensure any character portrayed is ${ageDescription}. The overall style should be ${
+            settings.style
+          }.`;
           const imagePart = await fileToGenerativePart(characterImage);
           generationContent = [textPrompt, imagePart];
         } else {
           // Standard text-to-image or description-based immersive generation.
           let characterDescription = "";
           if (settings.perspective.includes("Immersive")) {
-            // Use the refined facial features from image analysis
             if (
               characterMode === "student" &&
               studentImageAnalysis.facialFeatures
             ) {
-              characterDescription = `The main character has these features: ${studentImageAnalysis.facialFeatures}. `;
+              characterDescription = `The main character is named ${
+                settings.studentName || "the student"
+              }. If the main character is in the scene, they MUST have these features: ${
+                studentImageAnalysis.facialFeatures
+              }. `;
             } else if (
               characterMode === "custom" &&
               customCharacterDescription
             ) {
-              characterDescription = `The main character is described as: ${customCharacterDescription}. `;
+              characterDescription = `The main character is a custom character. If the main character is in the scene, they are described as: ${customCharacterDescription}. `;
             }
           } else {
-            if (mainCharacter.description) {
-              characterDescription = `The main character is ${mainCharacter.name}, who is described as: ${mainCharacter.description}. `;
+            if (mainCharacter.name && mainCharacter.description) {
+              characterDescription = `The main character is ${mainCharacter.name}. If they are in the scene, they are described as: ${mainCharacter.description}. `;
             }
           }
 
-          textPrompt = `${characterDescription}The scene is: ${scene.image_prompt}. The character should be portrayed as ${ageDescription}. The overall style should be ${settings.style}.`;
+          textPrompt = `${characterDescription}Generate an image for the following scene: ${scene.image_prompt}. The overall style should be ${settings.style}. If a character is portrayed, they should match the age of ${ageDescription}.`;
           generationContent = [textPrompt];
         }
 
