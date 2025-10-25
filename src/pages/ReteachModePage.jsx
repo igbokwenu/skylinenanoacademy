@@ -527,7 +527,7 @@ const ReteachModePage = () => {
               handleGenerateImages={runImageGenerationAndShowPreview}
               handlePreview={() => setIsPreviewVisible(true)}
               title="3. Create Reteach Lesson"
-              generateButtonText="Create Lesson Plan"
+              generateButtonText="Create Re-Teach Lesson"
             />
           </>
         )}
