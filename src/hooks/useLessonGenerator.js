@@ -189,8 +189,7 @@ export const useLessonGenerator = (initialSettings) => {
   };
 
   const handleGenerateImages = async () => {
-    // FULL, COMPLEX IMAGE GENERATION LOGIC IS RESTORED
-    if (!generatedLesson) return;
+    if (!generatedLesson) return false; // Return false if no lesson
     setIsGeneratingImages(true);
     setGenerationError(null);
 
@@ -271,12 +270,13 @@ export const useLessonGenerator = (initialSettings) => {
       });
       const scenesWithImages = await Promise.all(imagePromises);
       setLessonWithImages({ ...generatedLesson, lesson: scenesWithImages });
-      setIsPreviewVisible(true);
+      return true; // Return true on success
     } catch (error) {
       console.error("Batch image generation failed:", error);
       setGenerationError(
         "An error occurred during image generation. Please try again."
       );
+      return false; // Return false on failure
     } finally {
       setIsGeneratingImages(false);
     }

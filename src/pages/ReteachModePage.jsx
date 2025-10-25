@@ -51,6 +51,8 @@ const ReteachModePage = () => {
     });
 
   // --- SHARED LESSON GENERATION LOGIC (From the Hook) ---
+  const { handleGenerateImages: generateImagesInHook, ...restOfHook } =
+    useLessonGenerator(initialReteachSettings);
   const {
     settings,
     setSettings,
@@ -79,14 +81,13 @@ const ReteachModePage = () => {
     streamingOutput,
     tokenInfo,
     handleCreateLesson,
-    handleGenerateImages,
     handleStudentImageUpload,
     handleCustomCharacterImageUpload,
     handleGenerateCustomCharacterDescription,
     handleGenerateCharacter,
     handleSettingChange,
     abortCurrentPrompt,
-  } = useLessonGenerator(initialReteachSettings);
+  } = restOfHook;
 
   const handleImageUpload = (e) => {
     const file = e.target.files?.[0];
@@ -177,6 +178,14 @@ const ReteachModePage = () => {
       }
     } else {
       setAnalysisError("Failed to get a response from the analysis model.");
+    }
+  };
+
+  // FIX: Create a wrapper function to orchestrate the UI update
+  const runImageGenerationAndShowPreview = async () => {
+    const success = await generateImagesInHook(); // Call the hook's function
+    if (success) {
+      setIsPreviewVisible(true); // If it succeeds, update the local UI state
     }
   };
 
@@ -515,7 +524,7 @@ const ReteachModePage = () => {
               isGeneratingImages={isGeneratingImages}
               handleCreateLesson={handleCreateLesson}
               abortCurrentPrompt={abortCurrentPrompt}
-              handleGenerateImages={handleGenerateImages}
+              handleGenerateImages={runImageGenerationAndShowPreview}
               handlePreview={() => setIsPreviewVisible(true)}
               title="3. Create Reteach Lesson"
               generateButtonText="Create Lesson Plan"
