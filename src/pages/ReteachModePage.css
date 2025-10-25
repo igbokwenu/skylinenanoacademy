@@ -54,6 +54,6 @@
 /* Override grid layout from parent to stack panels when analysis is done */
 .lc-main {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: 2fr 1fr;
   gap: 20px;
 }
