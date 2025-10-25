@@ -163,13 +163,20 @@ const ReteachModePage = () => {
       const parsed = cleanAndParseJson(analysisJson);
       if (parsed) {
         setAnalysisResult(parsed);
+
+        // Defensively check if 'failedTopics' exists and is an array before joining.
+        // Use optional chaining (?.) and the nullish coalescing operator (??).
+        const topics =
+          Array.isArray(parsed.failedTopics) && parsed.failedTopics.length > 0
+            ? parsed.failedTopics.join(", ")
+            : "the topics identified in the analysis"; // A safe fallback string
+
         setSettings((prev) => ({
           ...prev,
           studentName: parsed.studentName || "Student",
           ageGroup: parsed.ageGroup,
-          prompt: `A lesson to reteach these topics: ${parsed.failedTopics.join(
-            ", "
-          )}.`,
+          // Use the safe 'topics' variable here
+          prompt: `A lesson to reteach these topics: ${topics}.`,
         }));
       } else {
         setAnalysisError(
