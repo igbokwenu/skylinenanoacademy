@@ -1,5 +1,6 @@
 //src/pages/ReteachModePage.jsx
 import React, { useState, useMemo } from "react";
+import { useLessonGenerator } from "../hooks/useLessonGenerator";
 import { useLanguageModel } from "../hooks/useLanguageModel";
 import { useMonitorDownload } from "../hooks/useMonitorDownload";
 import LessonPreview from "../components/LessonPreview";
@@ -8,43 +9,27 @@ import GenerationActionsPanel from "../components/GenerationActionsPanel";
 import { fileToGenerativePart, imageModel } from "../lib/firebase";
 import "./ReteachModePage.css";
 
-const cleanAndParseJson = (rawString) => {
-  if (!rawString || typeof rawString !== "string") return null;
-  const match = rawString.match(/```json\s*([\s\S]*?)\s*```/);
-  const jsonContent = match ? match[1] : rawString;
-  try {
-    return JSON.parse(jsonContent);
-  } catch (error) {
-    console.error("JSON parsing failed:", error);
-    return null;
-  }
+// Reteach mode starts with blank settings
+const initialReteachSettings = {
+  prompt: "",
+  format: "Storybook",
+  style: "Cartoon",
+  tone: "Funny",
+  ageGroup: "Grades 3-5 (Ages 8-10)",
+  perspective: "Immersive (Student is a character)",
+  studentName: "",
+  studentGender: "",
+  studentEthnicity: "",
+  studentPersonalFacts: "",
 };
 
 const ReteachModePage = () => {
   // State for the reteach-specific inputs
+  const [isPreviewVisible, setIsPreviewVisible] = useState(false);
   const [examImage, setExamImage] = useState(null);
   const [examText, setExamText] = useState("");
   const [analysisResult, setAnalysisResult] = useState(null);
   const [analysisError, setAnalysisError] = useState("");
-
-  // State for the lesson creation process (mirrors LessonCreatorPage)
-  const [settings, setSettings] = useState({
-    prompt: "",
-    format: "Storybook",
-    style: "Cartoon",
-    tone: "Educational",
-    ageGroup: "Grades 3-5 (Ages 8-10)",
-    perspective: "Immersive (Student is a character)",
-    studentName: "",
-  });
-  const [sceneCount, setSceneCount] = useState(5);
-  const [generatedLesson, setGeneratedLesson] = useState(null);
-  const [lessonWithImages, setLessonWithImages] = useState(null);
-  const [isGeneratingImages, setIsGeneratingImages] = useState(false);
-  const [isPreviewVisible, setIsPreviewVisible] = useState(false);
-  const [generationError, setGenerationError] = useState(null);
-
-  const { getMonitor } = useMonitorDownload();
 
   // Hook for script analysis
   const { isLoading: isAnalyzing, executePrompt: executeAnalysis } =
@@ -55,17 +40,50 @@ const ReteachModePage = () => {
       },
     });
 
-  // Hook for lesson generation
+  // Use the lesson generator hook
   const {
+    // We get setSettings from the hook to populate it
+    // ... pull in all the other states and handlers from the hook
+    settings,
+    setSettings,
+    sceneCount,
+    setSceneCount,
+    generatedLesson,
+    lessonWithImages,
+    isGeneratingImages,
+    generationError,
+    characterMode,
+    setCharacterMode,
+    customCharacterImage,
+    customCharacterDescription,
+    setCustomCharacterDescription,
+    customCharacterImageUse,
+    setCustomCharacterImageUse,
+    studentImage,
+    studentImageAnalysis,
+    studentImageUse,
+    setStudentImageUse,
+    mainCharacter,
+    setMainCharacter,
+
+    // Model Status
     isLoading,
+    isAnalysisLoading,
     status,
-    output: streamingOutput,
-    executePrompt,
-    abortCurrentPrompt,
+    streamingOutput,
     tokenInfo,
-  } = useLanguageModel({
-    apiName: "LanguageModel",
-  });
+    getMonitor,
+
+    // Handlers
+    handleCreateLesson,
+    handleGenerateImages,
+    handleStudentImageUpload,
+    handleCustomCharacterImageUpload,
+    handleGenerateCustomCharacterDescription,
+    handleGenerateCharacter,
+    handleSettingChange,
+    abortCurrentPrompt,
+  } = useLessonGenerator(initialReteachSettings);
 
   const handleImageUpload = (e) => {
     const file = e.target.files?.[0];
@@ -128,7 +146,7 @@ const ReteachModePage = () => {
       const parsed = cleanAndParseJson(analysisJson);
       if (parsed) {
         setAnalysisResult(parsed);
-        // Auto-populate the lesson settings
+        // CRITICAL STEP: Use the setter from the hook to update the engine's state
         setSettings((prev) => ({
           ...prev,
           studentName: parsed.studentName || "Student",
@@ -192,84 +210,55 @@ const ReteachModePage = () => {
     [sceneCount]
   );
 
+  // FULL, COMPLEX PROMPT LOGIC IS RESTORED
   const userRequestPrompt = useMemo(() => {
     let characterInfo = "";
-    if (settings.perspective.includes("Immersive") && settings.studentName) {
-      characterInfo = `The main character is the student, named "${settings.studentName}". Make the story about them.`;
-    }
-
-    return `
-      Create the content for a JSON object representing a lesson.
-      The lesson MUST have a title, EXACTLY ${sceneCount} lesson scenes, and a quiz with EXACTLY ${sceneCount} questions.
-      
-      Generate the content based on these specifications:
-      - Topic: ${settings.prompt}
-      - Format: ${settings.format}
-      - Visual Style: ${settings.style} for the image prompts.
-      - Tone: ${settings.tone} for the story paragraphs.
-      - Target Age Group: ${settings.ageGroup}
-      - Narrative Perspective: ${settings.perspective}. ${characterInfo}
-    `;
-  }, [settings, sceneCount]);
-
-  const handleCreateLesson = async () => {
-    setIsPreviewVisible(false);
-    setGeneratedLesson(null);
-    setLessonWithImages(null);
-    setGenerationError(null);
-
-    const rawAiResult = await executePrompt(
-      userRequestPrompt,
-      { responseConstraint: lessonSchema },
-      getMonitor()
-    );
-
-    if (rawAiResult) {
-      const parsedLesson = cleanAndParseJson(rawAiResult);
-      if (parsedLesson) {
-        setGeneratedLesson(parsedLesson);
-      } else {
-        setGenerationError(
-          "The AI failed to generate a valid lesson structure. Please try again."
-        );
-      }
-    } else if (!isLoading) {
-      setGenerationError(
-        "Lesson generation failed. The model may be offline or the request was aborted."
-      );
-    }
-  };
-
-  const handleGenerateImages = async () => {
-    if (!generatedLesson) return;
-    setIsGeneratingImages(true);
-    setGenerationError(null);
-    try {
-      const imagePromises = generatedLesson.lesson.map(async (scene) => {
-        const textPrompt = `Generate an image in a ${settings.style} style for the following scene: ${scene.image_prompt}`;
-        const result = await imageModel.generateContent(textPrompt);
-        const response = await result.response;
-        const candidates = response.candidates;
-        if (candidates && candidates.length > 0) {
-          const imagePart = candidates[0].content.parts.find(
-            (p) => p.inlineData
-          );
-          if (imagePart) {
-            return { ...scene, imageData: imagePart.inlineData.data };
-          }
+    if (settings.perspective.includes("Immersive")) {
+      if (characterMode === "student") {
+        characterInfo = `The main character is a student.`;
+        if (settings.studentName)
+          characterInfo += ` Their name is "${settings.studentName}".`;
+        if (studentImageUse === "description") {
+          if (studentImageAnalysis.gender)
+            characterInfo += ` Their gender is ${studentImageAnalysis.gender}.`;
+          if (studentImageAnalysis.ethnicity)
+            characterInfo += ` Their ethnicity is ${studentImageAnalysis.ethnicity}.`;
+          if (studentImageAnalysis.facialFeatures)
+            characterInfo += ` Facial features: ${studentImageAnalysis.facialFeatures}.`;
+        } else {
+          if (settings.studentGender)
+            characterInfo += ` Their gender is ${settings.studentGender}.`;
+          if (settings.studentEthnicity)
+            characterInfo += ` Their ethnicity is ${settings.studentEthnicity}.`;
         }
-        return { ...scene, imageData: null };
-      });
-      const scenesWithImages = await Promise.all(imagePromises);
-      setLessonWithImages({ ...generatedLesson, lesson: scenesWithImages });
-      setIsPreviewVisible(true); // Auto-open preview after generating images
-    } catch (error) {
-      console.error("Image generation failed:", error);
-      setGenerationError("An error occurred during image generation.");
-    } finally {
-      setIsGeneratingImages(false);
+        if (settings.studentPersonalFacts)
+          characterInfo += ` Here are some personal facts about them: ${settings.studentPersonalFacts}.`;
+      } else {
+        characterInfo = `The main character is a custom character.`;
+        if (customCharacterDescription)
+          characterInfo += ` Description: ${customCharacterDescription}.`;
+      }
+    } else {
+      if (mainCharacter.name && mainCharacter.description) {
+        characterInfo = `The main character is named ${mainCharacter.name}. Description: ${mainCharacter.description}.`;
+      }
     }
-  };
+    return `Create the content for a JSON object representing a lesson. The lesson MUST have a title, EXACTLY ${sceneCount} lesson scenes, and a quiz with EXACTLY ${sceneCount} questions. Generate the content based on these specifications:
+- Topic: ${settings.prompt}
+- Format: ${settings.format}
+- Visual Style: ${settings.style} for the image prompts.
+- Tone: ${settings.tone} for the story paragraphs.
+- Target Age Group: ${settings.ageGroup}
+- Narrative Perspective: ${settings.perspective}. ${characterInfo}`;
+  }, [
+    settings,
+    sceneCount,
+    characterMode,
+    studentImageUse,
+    studentImageAnalysis,
+    customCharacterDescription,
+    mainCharacter,
+  ]);
 
   return (
     <div className="page-container">
@@ -309,8 +298,8 @@ const ReteachModePage = () => {
             value={examText}
             onChange={(e) => setExamText(e.target.value)}
             rows="5"
-            // maxLength="500"
-            placeholder="Optionally, add more details here. For example, 'The student really struggled with question 5 about long division.' (500 character limit)"
+            maxLength="5000"
+            placeholder="Optionally, add more details here. For example, 'The student really struggled with question 5 about long division.' (5000 character limit)"
           />
           <button
             onClick={handleAnalyzeScript}
