@@ -22,7 +22,12 @@ const base64ToBlob = (base64, contentType = "image/png") => {
   return new Blob(byteArrays, { type: contentType });
 };
 
-const LessonPreview = ({ lesson, lessonSettings, onClose }) => {
+const LessonPreview = ({
+  lesson,
+  lessonSettings,
+  onClose,
+  isReteach = false,
+}) => {
   const [editableLesson, setEditableLesson] = useState(
     JSON.parse(JSON.stringify(lesson))
   );
@@ -113,7 +118,7 @@ const LessonPreview = ({ lesson, lessonSettings, onClose }) => {
       blurb: sanitizedBlurb,
       lesson: lessonWithBlobs.lesson,
       quiz: lessonWithBlobs.quiz,
-      metadata: { ...lessonSettings },
+      metadata: { ...lessonSettings, isReteach: isReteach },
       ratings: [],
       createdAt: new Date(),
     };

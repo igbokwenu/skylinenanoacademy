@@ -36,6 +36,7 @@ const BrowseLessonsPage = () => {
     tone: "All",
     ageGroup: "All",
     perspective: "All",
+    isReteach: "All",
   });
 
   const componentRef = useRef();
@@ -95,6 +96,13 @@ const BrowseLessonsPage = () => {
     return lessons.filter((lesson) => {
       return Object.entries(filters).every(([key, value]) => {
         if (value === "All") return true;
+        // Handle boolean filter for isReteach
+        if (key === "isReteach") {
+          return (
+            (value === "Yes" && lesson.metadata.isReteach) ||
+            (value === "No" && !lesson.metadata.isReteach)
+          );
+        }
         return lesson.metadata[key] === value;
       });
     });
@@ -171,6 +179,14 @@ const BrowseLessonsPage = () => {
             </select>
           </div>
         ))}
+        <div className="filter-item">
+          <label htmlFor="isReteach">Reteach Lesson</label>
+          <select name="isReteach" id="isReteach" onChange={handleFilterChange}>
+            <option value="All">All</option>
+            <option value="Yes">Yes</option>
+            <option value="No">No</option>
+          </select>
+        </div>
       </div>
 
       <div className="bl-grid">
@@ -185,6 +201,9 @@ const BrowseLessonsPage = () => {
                 <h3>{lesson.title}</h3>
                 <p className="lesson-card-blurb">{lesson.blurb}</p>
                 <div className="lesson-card-tags">
+                  {lesson.metadata.isReteach && (
+                    <span className="tag reteach-tag">Reteach</span>
+                  )}
                   <span className="tag">{lesson.metadata.format}</span>
                   <span className="tag">{lesson.metadata.style}</span>
                   <span className="tag">{lesson.metadata.ageGroup}</span>

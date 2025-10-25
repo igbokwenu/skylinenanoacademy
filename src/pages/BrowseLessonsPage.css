@@ -120,6 +120,11 @@
   font-weight: 500;
 }
 
+.reteach-tag {
+  background-color: #d4edda; /* A green to signify reteach/success */
+  color: #155724;
+}
+
 /* NEW styles for the card footer */
 .lesson-card-footer {
   margin-top: auto; /* Pushes the footer to the bottom */

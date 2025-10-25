@@ -5,7 +5,7 @@ import { useLanguageModel } from "../hooks/useLanguageModel"; // For analysis on
 import LessonPreview from "../components/LessonPreview";
 import LessonSettingsPanel from "../components/LessonSettingsPanel";
 import GenerationActionsPanel from "../components/GenerationActionsPanel";
-import { fileToGenerativePart } from "../lib/firebase";
+import "./ReteachModePage.css";
 
 // This helper is only needed for parsing the analysis result on this page
 const cleanAndParseJson = (rawString) => {
@@ -127,15 +127,34 @@ const ReteachModePage = () => {
       },
       required: ["studentName", "ageGroup", "failedTopics", "lessonOutline"],
     };
-    const promptParts = [
+
+    // 1. Combine all text parts into a single string
+    const textParts = [
       "Analyze the provided student's test/quiz script. Identify the questions or areas where the student struggled or failed. Extract the student's name and estimate their age group. Develop a concise lesson plan outline focusing on the areas where the student failed. Also, list the specific topics that need reteaching.",
       "You MUST respond in a valid JSON object matching the specified schema.",
     ];
-    if (examText)
-      promptParts.push(`\n\nAdditional Context from Educator:\n${examText}`);
-    if (examImage) promptParts.push(await fileToGenerativePart(examImage));
+    if (examText) {
+      textParts.push(`\n\nAdditional Context from Educator:\n${examText}`);
+    }
+    const combinedText = textParts.join(" ");
 
-    const analysisJson = await executeAnalysis(promptParts, {
+    // 2. Build the structured content array for the prompt
+    const promptContent = [{ type: "text", value: combinedText }];
+    if (examImage) {
+      // The hook expects the raw File object for 'image' type
+      promptContent.push({ type: "image", value: examImage });
+    }
+
+    // 3. Assemble the final prompt in the format the model expects
+    const finalPromptForAnalysis = [
+      {
+        role: "user",
+        content: promptContent,
+      },
+    ];
+
+    // 4. Execute the prompt
+    const analysisJson = await executeAnalysis(finalPromptForAnalysis, {
       responseConstraint: { schema: analysisSchema },
     });
 
@@ -143,7 +162,6 @@ const ReteachModePage = () => {
       const parsed = cleanAndParseJson(analysisJson);
       if (parsed) {
         setAnalysisResult(parsed);
-        // This is the magic step: Feed the results into the shared hook's state
         setSettings((prev) => ({
           ...prev,
           studentName: parsed.studentName || "Student",
