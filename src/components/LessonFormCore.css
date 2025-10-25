@@ -1,0 +1,160 @@
+/* Contains shared styles for LessonSettingsPanel and GenerationActionsPanel */
+.lc-settings-panel,
+.lc-actions-panel {
+  background-color: #ffffff;
+  padding: 25px;
+  border-radius: 12px;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08);
+  flex-grow: 1;
+}
+
+.lc-settings-panel h3,
+.lc-actions-panel h3 {
+  margin-top: 0;
+  margin-bottom: 20px;
+  border-bottom: 1px solid #e0e0e0;
+  padding-bottom: 10px;
+}
+
+textarea {
+  width: 100%;
+  padding: 10px;
+  border-radius: 6px;
+  border: 1px solid #ccc;
+  font-family: inherit;
+  font-size: 1em;
+  margin-bottom: 15px;
+}
+
+.example-prompts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 20px;
+  align-items: center;
+}
+
+.example-prompt-btn {
+  background: #f0f0f0;
+  border: 1px solid #ddd;
+  padding: 5px 10px;
+  font-size: 0.85em;
+  border-radius: 20px;
+  cursor: pointer;
+}
+
+.settings-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 20px;
+}
+
+.setting-item {
+  display: flex;
+  flex-direction: column;
+}
+
+.setting-item label {
+  font-weight: 500;
+  margin-bottom: 5px;
+}
+
+.setting-item select,
+.setting-item input[type="text"] {
+  width: 100%;
+  padding: 10px;
+  border-radius: 6px;
+  border: 1px solid #ccc;
+}
+
+.scene-count-slider input[type="range"] {
+  width: 100%;
+}
+
+.button-group {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 15px;
+}
+
+.generate-btn,
+.abort-btn,
+.preview-btn,
+.generate-img-btn {
+  width: 100%;
+  padding: 12px;
+  font-size: 1.1em;
+}
+
+.abort-btn {
+  background-color: #dc3545;
+}
+
+.api-status-details {
+  background-color: #f8f9fa;
+  padding: 10px;
+  border-radius: 6px;
+  font-size: 0.9em;
+  color: #333;
+  margin-bottom: 15px;
+}
+
+.error-message {
+  background-color: #f8d7da;
+  color: #721c24;
+  padding: 15px;
+  border-radius: 8px;
+  margin-bottom: 15px;
+}
+
+.collapsible-stream {
+  margin-top: 15px;
+}
+
+.stream-toggle-btn {
+  width: 100%;
+  background: none;
+  border: 1px solid #ccc;
+  color: #333;
+  padding: 8px;
+  text-align: left;
+}
+
+.output {
+  max-height: 200px;
+  overflow-y: auto;
+  background: #2d2d2d;
+  color: #f0f0f0;
+  padding: 15px;
+  border-radius: 6px;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  margin-top: 10px;
+}
+
+.preview-ready {
+  border-top: 2px dashed #0c64e4;
+  margin-top: 20px;
+  padding-top: 20px;
+  text-align: center;
+}
+
+.preview-ready h4 {
+  margin: 0 0 10px 0;
+  color: #0c64e4;
+}
+
+.preview-ready p {
+  font-style: italic;
+  color: #555;
+  margin-bottom: 15px;
+}
+
+.generate-img-btn {
+  margin-top: 10px;
+  background-color: #17a2b8;
+}
+
+.generate-img-btn:hover {
+  background-color: #138496;
+}
