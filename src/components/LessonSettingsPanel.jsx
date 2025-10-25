@@ -2,7 +2,6 @@
 import React from "react";
 import "./LessonFormCore.css"; // Shared styles
 
-// --- Configuration ---
 const lessonParams = {
   formats: ["Manga", "Storybook", "Comic Book", "Science Journal"],
   styles: ["Cartoon", "Photorealistic", "3D Animation", "Anime", "Watercolor"],
@@ -32,8 +31,8 @@ const LessonSettingsPanel = ({
   setSettings,
   sceneCount,
   setSceneCount,
-  children, // To allow custom fields for different pages
-  isReteachMode = false, // Flag to slightly alter UI text
+  children, // This will now hold all the complex character UI
+  isReteachMode = false,
 }) => {
   const handleSettingChange = (e) => {
     const { name, value } = e.target;
@@ -99,7 +98,7 @@ const LessonSettingsPanel = ({
           </div>
         ))}
 
-        {/* Children prop is used here to inject page-specific fields */}
+        {/* The children prop injects all character-related UI here */}
         {children}
 
         <div className="setting-item scene-count-slider">
@@ -114,19 +113,6 @@ const LessonSettingsPanel = ({
             max="12"
             value={sceneCount}
             onChange={(e) => setSceneCount(e.target.value)}
-          />
-        </div>
-        <div className="setting-item student-name-input">
-          <label htmlFor="studentName">
-            Student's Name (for personalization)
-          </label>
-          <input
-            type="text"
-            id="studentName"
-            name="studentName"
-            value={settings.studentName}
-            onChange={handleSettingChange}
-            placeholder="Enter name for immersive story"
           />
         </div>
       </div>

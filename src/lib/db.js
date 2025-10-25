@@ -4,9 +4,8 @@ import Dexie from "dexie";
 
 export const db = new Dexie("SkylineNanoAcademyDB");
 
-// Increment the version number due to the data structure change (rating -> ratings)
-db.version(3).stores({
-  // <-- VERSION INCREMENTED FROM 2 to 3
+// Increment the version number to 4 to introduce the new 'isReteach' index.
+db.version(4).stores({
   lessons:
-    "++id, createdAt, metadata.format, metadata.style, metadata.tone, metadata.ageGroup, metadata.perspective",
+    "++id, createdAt, metadata.format, metadata.style, metadata.tone, metadata.ageGroup, metadata.perspective, metadata.isReteach", // Added metadata.isReteach
 });

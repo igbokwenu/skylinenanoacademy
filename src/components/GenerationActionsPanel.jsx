@@ -1,5 +1,5 @@
 //src/components/GenerationActionsPanel.jsx
-import React, { useState } from 'react';
+import React, { useState } from "react";
 import "./LessonFormCore.css"; // Shared styles
 
 const GenerationActionsPanel = ({
@@ -14,7 +14,8 @@ const GenerationActionsPanel = ({
   abortCurrentPrompt,
   handleGenerateImages,
   handlePreview,
-  title = "3. Generate & Preview" // Allow custom title
+  title = "3. Generate & Preview",
+  generateButtonText = "Generate Lesson", // FIX: Added prop with a default value
 }) => {
   const [isStreamVisible, setIsStreamVisible] = useState(false);
 
@@ -31,7 +32,8 @@ const GenerationActionsPanel = ({
           onClick={handleCreateLesson}
           disabled={isLoading}
         >
-          {isLoading ? "Generating..." : "Create Lesson Plan"}
+          {/* FIX: Using the dynamic prop for the button text */}
+          {isLoading ? "Generating..." : generateButtonText}
         </button>
         {isLoading && (
           <button className="abort-btn" onClick={abortCurrentPrompt}>
@@ -57,19 +59,14 @@ const GenerationActionsPanel = ({
           >
             {isStreamVisible ? "Hide Stream" : "Click to view stream"}
           </button>
-          {isStreamVisible && (
-            <pre className="output">{streamingOutput}</pre>
-          )}
+          {isStreamVisible && <pre className="output">{streamingOutput}</pre>}
         </div>
       )}
       {generatedLesson && !isLoading && (
         <div className="preview-ready">
           <h4>Your lesson is ready!</h4>
           <p>"{generatedLesson.title}"</p>
-          <button
-            className="preview-btn"
-            onClick={handlePreview}
-          >
+          <button className="preview-btn" onClick={handlePreview}>
             Preview & Edit Lesson
           </button>
           <button
