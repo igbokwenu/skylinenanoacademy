@@ -358,7 +358,17 @@ export const useLessonGenerator = (initialSettings) => {
     );
     if (result) {
       const parsedResult = cleanAndParseJson(result);
-      if (parsedResult) setMainCharacter(parsedResult);
+
+      if (parsedResult) {
+        // Only update the state if parsing was successful.
+        // Also, use nullish coalescing (??) as a failsafe in case the AI
+        // returns a valid JSON but omits a key. This guarantees the properties
+        // are always defined strings.
+        setMainCharacter({
+          name: parsedResult.name ?? "",
+          description: parsedResult.description ?? "",
+        });
+      }
     }
   };
 
