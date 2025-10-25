@@ -1,20 +1,31 @@
 //src/pages/ReteachModePage.jsx
-import React, { useState, useMemo } from "react";
-import { useLessonGenerator } from "../hooks/useLessonGenerator";
-import { useLanguageModel } from "../hooks/useLanguageModel";
-import { useMonitorDownload } from "../hooks/useMonitorDownload";
+import React, { useState } from "react";
+import { useLessonGenerator } from "../hooks/useLessonGenerator"; // The engine
+import { useLanguageModel } from "../hooks/useLanguageModel"; // For analysis only
 import LessonPreview from "../components/LessonPreview";
 import LessonSettingsPanel from "../components/LessonSettingsPanel";
 import GenerationActionsPanel from "../components/GenerationActionsPanel";
-import { fileToGenerativePart, imageModel } from "../lib/firebase";
-import "./ReteachModePage.css";
+import { fileToGenerativePart } from "../lib/firebase";
 
-// Reteach mode starts with blank settings
+// This helper is only needed for parsing the analysis result on this page
+const cleanAndParseJson = (rawString) => {
+  if (!rawString || typeof rawString !== "string") return null;
+  const match = rawString.match(/```json\s*([\s\S]*?)\s*```/);
+  const jsonContent = match ? match[1] : rawString;
+  try {
+    return JSON.parse(jsonContent);
+  } catch (error) {
+    console.error("JSON parsing failed:", error);
+    return null;
+  }
+};
+
+// Reteach mode starts with blank/default settings
 const initialReteachSettings = {
   prompt: "",
   format: "Storybook",
   style: "Cartoon",
-  tone: "Funny",
+  tone: "Educational",
   ageGroup: "Grades 3-5 (Ages 8-10)",
   perspective: "Immersive (Student is a character)",
   studentName: "",
@@ -24,14 +35,13 @@ const initialReteachSettings = {
 };
 
 const ReteachModePage = () => {
-  // State for the reteach-specific inputs
+  // --- PAGE-SPECIFIC STATE & LOGIC (For Analysis Step) ---
   const [isPreviewVisible, setIsPreviewVisible] = useState(false);
   const [examImage, setExamImage] = useState(null);
   const [examText, setExamText] = useState("");
   const [analysisResult, setAnalysisResult] = useState(null);
   const [analysisError, setAnalysisError] = useState("");
 
-  // Hook for script analysis
   const { isLoading: isAnalyzing, executePrompt: executeAnalysis } =
     useLanguageModel({
       apiName: "LanguageModel",
@@ -40,10 +50,8 @@ const ReteachModePage = () => {
       },
     });
 
-  // Use the lesson generator hook
+  // --- SHARED LESSON GENERATION LOGIC (From the Hook) ---
   const {
-    // We get setSettings from the hook to populate it
-    // ... pull in all the other states and handlers from the hook
     settings,
     setSettings,
     sceneCount,
@@ -65,16 +73,11 @@ const ReteachModePage = () => {
     setStudentImageUse,
     mainCharacter,
     setMainCharacter,
-
-    // Model Status
     isLoading,
     isAnalysisLoading,
     status,
     streamingOutput,
     tokenInfo,
-    getMonitor,
-
-    // Handlers
     handleCreateLesson,
     handleGenerateImages,
     handleStudentImageUpload,
@@ -90,33 +93,6 @@ const ReteachModePage = () => {
     if (file) setExamImage(file);
   };
 
-  const analysisSchema = {
-    type: "object",
-    properties: {
-      studentName: {
-        type: "string",
-        description: "The student's name, if visible. Otherwise 'Student'.",
-      },
-      ageGroup: {
-        type: "string",
-        description:
-          "The most likely age group from the options: 'Grades 1-2 (Ages 6-7)', 'Grades 3-5 (Ages 8-10)', 'Grades 6-8 (Ages 11-13)', 'Grades 9-12 (Ages 14-18)'.",
-      },
-      failedTopics: {
-        type: "array",
-        items: { type: "string" },
-        description:
-          "A list of specific topics or concepts the student struggled with.",
-      },
-      lessonOutline: {
-        type: "string",
-        description:
-          "A short, one-paragraph suggested lesson plan to reteach the failed topics.",
-      },
-    },
-    required: ["studentName", "ageGroup", "failedTopics", "lessonOutline"],
-  };
-
   const handleAnalyzeScript = async () => {
     if (!examImage && !examText) {
       setAnalysisError("Please upload an image or provide text details.");
@@ -125,28 +101,49 @@ const ReteachModePage = () => {
     setAnalysisError("");
     setAnalysisResult(null);
 
+    const analysisSchema = {
+      type: "object",
+      properties: {
+        studentName: {
+          type: "string",
+          description: "The student's name, if visible. Otherwise 'Student'.",
+        },
+        ageGroup: {
+          type: "string",
+          description:
+            "The most likely age group from the options: 'Grades 1-2 (Ages 6-7)', 'Grades 3-5 (Ages 8-10)', 'Grades 6-8 (Ages 11-13)', 'Grades 9-12 (Ages 14-18)'.",
+        },
+        failedTopics: {
+          type: "array",
+          items: { type: "string" },
+          description:
+            "A list of specific topics or concepts the student struggled with.",
+        },
+        lessonOutline: {
+          type: "string",
+          description:
+            "A short, one-paragraph suggested lesson plan to reteach the failed topics.",
+        },
+      },
+      required: ["studentName", "ageGroup", "failedTopics", "lessonOutline"],
+    };
     const promptParts = [
       "Analyze the provided student's test/quiz script. Identify the questions or areas where the student struggled or failed. Extract the student's name and estimate their age group. Develop a concise lesson plan outline focusing on the areas where the student failed. Also, list the specific topics that need reteaching.",
       "You MUST respond in a valid JSON object matching the specified schema.",
     ];
-
-    if (examText) {
+    if (examText)
       promptParts.push(`\n\nAdditional Context from Educator:\n${examText}`);
-    }
-    if (examImage) {
-      const imagePart = await fileToGenerativePart(examImage);
-      promptParts.push(imagePart);
-    }
+    if (examImage) promptParts.push(await fileToGenerativePart(examImage));
 
-    const analysisJson = await executeAnalysis(promptParts.join(""), {
-      responseConstraint: analysisSchema,
+    const analysisJson = await executeAnalysis(promptParts, {
+      responseConstraint: { schema: analysisSchema },
     });
 
     if (analysisJson) {
       const parsed = cleanAndParseJson(analysisJson);
       if (parsed) {
         setAnalysisResult(parsed);
-        // CRITICAL STEP: Use the setter from the hook to update the engine's state
+        // This is the magic step: Feed the results into the shared hook's state
         setSettings((prev) => ({
           ...prev,
           studentName: parsed.studentName || "Student",
@@ -165,101 +162,6 @@ const ReteachModePage = () => {
     }
   };
 
-  // Lesson generation logic (same as LessonCreatorPage, just memoizing the prompt differently)
-  const lessonSchema = useMemo(
-    () => ({
-      type: "object",
-      properties: {
-        title: { type: "string" },
-        lesson: {
-          type: "array",
-          minItems: Number(sceneCount),
-          maxItems: Number(sceneCount),
-          items: {
-            type: "object",
-            properties: {
-              scene: { type: "number" },
-              image_prompt: { type: "string" },
-              paragraph: { type: "string" },
-            },
-            required: ["scene", "image_prompt", "paragraph"],
-          },
-        },
-        quiz: {
-          type: "array",
-          minItems: Number(sceneCount),
-          maxItems: Number(sceneCount),
-          items: {
-            type: "object",
-            properties: {
-              question: { type: "string" },
-              options: {
-                type: "array",
-                items: { type: "string" },
-                minItems: 4,
-                maxItems: 4,
-              },
-              answer: { type: "string" },
-            },
-            required: ["question", "options", "answer"],
-          },
-        },
-      },
-      required: ["title", "lesson", "quiz"],
-    }),
-    [sceneCount]
-  );
-
-  // FULL, COMPLEX PROMPT LOGIC IS RESTORED
-  const userRequestPrompt = useMemo(() => {
-    let characterInfo = "";
-    if (settings.perspective.includes("Immersive")) {
-      if (characterMode === "student") {
-        characterInfo = `The main character is a student.`;
-        if (settings.studentName)
-          characterInfo += ` Their name is "${settings.studentName}".`;
-        if (studentImageUse === "description") {
-          if (studentImageAnalysis.gender)
-            characterInfo += ` Their gender is ${studentImageAnalysis.gender}.`;
-          if (studentImageAnalysis.ethnicity)
-            characterInfo += ` Their ethnicity is ${studentImageAnalysis.ethnicity}.`;
-          if (studentImageAnalysis.facialFeatures)
-            characterInfo += ` Facial features: ${studentImageAnalysis.facialFeatures}.`;
-        } else {
-          if (settings.studentGender)
-            characterInfo += ` Their gender is ${settings.studentGender}.`;
-          if (settings.studentEthnicity)
-            characterInfo += ` Their ethnicity is ${settings.studentEthnicity}.`;
-        }
-        if (settings.studentPersonalFacts)
-          characterInfo += ` Here are some personal facts about them: ${settings.studentPersonalFacts}.`;
-      } else {
-        characterInfo = `The main character is a custom character.`;
-        if (customCharacterDescription)
-          characterInfo += ` Description: ${customCharacterDescription}.`;
-      }
-    } else {
-      if (mainCharacter.name && mainCharacter.description) {
-        characterInfo = `The main character is named ${mainCharacter.name}. Description: ${mainCharacter.description}.`;
-      }
-    }
-    return `Create the content for a JSON object representing a lesson. The lesson MUST have a title, EXACTLY ${sceneCount} lesson scenes, and a quiz with EXACTLY ${sceneCount} questions. Generate the content based on these specifications:
-- Topic: ${settings.prompt}
-- Format: ${settings.format}
-- Visual Style: ${settings.style} for the image prompts.
-- Tone: ${settings.tone} for the story paragraphs.
-- Target Age Group: ${settings.ageGroup}
-- Narrative Perspective: ${settings.perspective}. ${characterInfo}`;
-  }, [
-    settings,
-    sceneCount,
-    characterMode,
-    studentImageUse,
-    studentImageAnalysis,
-    customCharacterDescription,
-    mainCharacter,
-  ]);
-
   return (
     <div className="page-container">
       {isPreviewVisible && (generatedLesson || lessonWithImages) && (
@@ -267,7 +169,7 @@ const ReteachModePage = () => {
           lesson={lessonWithImages || generatedLesson}
           lessonSettings={settings}
           onClose={() => setIsPreviewVisible(false)}
-          isReteach={true} // Explicitly TRUE for this page
+          isReteach={true}
         />
       )}
 
@@ -281,7 +183,7 @@ const ReteachModePage = () => {
 
       <div className="lc-main">
         <div className="reteach-input-panel">
-          <h3>Upload Student's Work</h3>
+          <h3>1. Upload Student's Work</h3>
           <div className="upload-area">
             <label htmlFor="exam-upload">Upload Image of Exam/Quiz</label>
             <input
@@ -309,7 +211,6 @@ const ReteachModePage = () => {
             {isAnalyzing ? "Analyzing..." : "Analyze and Create Lesson Outline"}
           </button>
           {analysisError && <p className="error-message">{analysisError}</p>}
-
           {analysisResult && (
             <div className="analysis-results">
               <h4>Analysis Complete!</h4>
@@ -318,8 +219,8 @@ const ReteachModePage = () => {
                 {analysisResult.lessonOutline}
               </p>
               <p>
-                The lesson settings have been pre-filled. You can adjust them
-                before creating the lesson.
+                The lesson settings below have been pre-filled. You can adjust
+                them before creating the lesson.
               </p>
             </div>
           )}
@@ -333,7 +234,259 @@ const ReteachModePage = () => {
               sceneCount={sceneCount}
               setSceneCount={setSceneCount}
               isReteachMode={true}
-            />
+            >
+              {/* This is the same advanced character UI from LessonCreatorPage, now powered by the hook */}
+              {!settings.perspective.includes("Immersive") ? (
+                <div className="setting-item main-character-panel">
+                  <label>Main Character</label>
+                  <button
+                    onClick={handleGenerateCharacter}
+                    disabled={isAnalysisLoading}
+                  >
+                    {isAnalysisLoading ? "Generating..." : "Generate Character"}
+                  </button>
+                  <input
+                    type="text"
+                    placeholder="Character Name"
+                    value={mainCharacter.name}
+                    onChange={(e) =>
+                      setMainCharacter((p) => ({ ...p, name: e.target.value }))
+                    }
+                  />
+                  <textarea
+                    placeholder="Character Description"
+                    value={mainCharacter.description}
+                    onChange={(e) =>
+                      setMainCharacter((p) => ({
+                        ...p,
+                        description: e.target.value,
+                      }))
+                    }
+                    rows={4}
+                  />
+                </div>
+              ) : (
+                <>
+                  <div className="setting-item">
+                    <label>Character Mode</label>
+                    <div>
+                      <input
+                        type="radio"
+                        id="student-char"
+                        name="characterMode"
+                        value="student"
+                        checked={characterMode === "student"}
+                        onChange={() => setCharacterMode("student")}
+                      />
+                      <label htmlFor="student-char">Student as character</label>
+                      <input
+                        type="radio"
+                        id="custom-char"
+                        name="characterMode"
+                        value="custom"
+                        checked={characterMode === "custom"}
+                        onChange={() => setCharacterMode("custom")}
+                      />
+                      <label htmlFor="custom-char">Custom character</label>
+                    </div>
+                  </div>
+                  {characterMode === "student" ? (
+                    <>
+                      <div className="setting-item student-name-input">
+                        <label htmlFor="studentName">Student's Name</label>
+                        <input
+                          type="text"
+                          id="studentName"
+                          name="studentName"
+                          value={settings.studentName}
+                          onChange={handleSettingChange}
+                          placeholder="Enter name for immersive story"
+                        />
+                      </div>
+                      <div className="setting-item">
+                        <label>Upload Student Image</label>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={handleStudentImageUpload}
+                        />
+                        {isAnalysisLoading && <div className="loader"></div>}
+                      </div>
+                      {studentImage && (
+                        <>
+                          <div className="setting-item">
+                            <label>Image Usage</label>
+                            <div>
+                              <input
+                                type="radio"
+                                id="student-direct"
+                                name="studentImageUse"
+                                value="direct"
+                                checked={studentImageUse === "direct"}
+                                onChange={() => setStudentImageUse("direct")}
+                              />
+                              <label htmlFor="student-direct">
+                                Use Image Directly
+                              </label>
+                              <input
+                                type="radio"
+                                id="student-desc"
+                                name="studentImageUse"
+                                value="description"
+                                checked={studentImageUse === "description"}
+                                onChange={() =>
+                                  setStudentImageUse("description")
+                                }
+                              />
+                              <label htmlFor="student-desc">
+                                Use Image Description
+                              </label>
+                            </div>
+                          </div>
+                          {studentImageUse === "description" && (
+                            <div className="image-analysis-results">
+                              <p>
+                                <strong>Gender:</strong>{" "}
+                                {studentImageAnalysis.gender}
+                              </p>
+                              <p>
+                                <strong>Ethnicity:</strong>{" "}
+                                {studentImageAnalysis.ethnicity}
+                              </p>
+                              <p>
+                                <strong>Facial Features:</strong>{" "}
+                                {studentImageAnalysis.facialFeatures}
+                              </p>
+                            </div>
+                          )}
+                        </>
+                      )}
+                      <div className="immersive-grid">
+                        <div className="setting-item">
+                          <label htmlFor="studentGender">
+                            Student's Gender
+                          </label>
+                          <select
+                            id="studentGender"
+                            name="studentGender"
+                            value={settings.studentGender}
+                            onChange={handleSettingChange}
+                          >
+                            <option value="">Select Gender</option>
+                            <option value="Male">Male</option>
+                            <option value="Female">Female</option>
+                            <option value="Other">Other</option>
+                          </select>
+                        </div>
+                        <div className="setting-item">
+                          <label htmlFor="studentEthnicity">
+                            Student's Ethnicity
+                          </label>
+                          <select
+                            id="studentEthnicity"
+                            name="studentEthnicity"
+                            value={settings.studentEthnicity}
+                            onChange={handleSettingChange}
+                          >
+                            <option value="">Select Ethnicity</option>
+                            <option value="American Indian or Alaska Native">
+                              American Indian or Alaska Native
+                            </option>
+                            <option value="Asian">Asian</option>
+                            <option value="Black or African American">
+                              Black or African American
+                            </option>
+                            <option value="White">White</option>
+                            <option value="Hispanic or Latino">
+                              Hispanic or Latino
+                            </option>
+                            <option value="Middle Eastern or North African (MENA)">
+                              Middle Eastern or North African (MENA)
+                            </option>
+                            <option value="Native Hawaiian or Pacific Islander">
+                              Native Hawaiian or Pacific Islander
+                            </option>
+                          </select>
+                        </div>
+                      </div>
+                      <div className="setting-item student-name-input">
+                        <label htmlFor="studentPersonalFacts">
+                          Personal Facts
+                        </label>
+                        <textarea
+                          id="studentPersonalFacts"
+                          name="studentPersonalFacts"
+                          value={settings.studentPersonalFacts}
+                          onChange={handleSettingChange}
+                          maxLength="180"
+                          placeholder="You can input other interesting or personal facts to further personalize the lesson. e.g., Loves to play the guitar, has a pet cat named Randy, favorite; food, cartoon, Pokemon, etc. (max 180 characters)"
+                        ></textarea>
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <div className="setting-item">
+                        <label>Upload Character Image</label>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={handleCustomCharacterImageUpload}
+                        />
+                      </div>
+                      <div className="setting-item">
+                        <label>Character Description</label>
+                        <textarea
+                          value={customCharacterDescription}
+                          onChange={(e) =>
+                            setCustomCharacterDescription(e.target.value)
+                          }
+                        />
+                        <button
+                          onClick={handleGenerateCustomCharacterDescription}
+                          disabled={!customCharacterImage || isAnalysisLoading}
+                        >
+                          {isAnalysisLoading
+                            ? "Generating..."
+                            : "Generate from Image"}
+                        </button>
+                      </div>
+                      <div className="setting-item">
+                        <label>Image Usage</label>
+                        <div>
+                          <input
+                            type="radio"
+                            id="custom-direct"
+                            name="customImageUse"
+                            value="direct"
+                            checked={customCharacterImageUse === "direct"}
+                            onChange={() =>
+                              setCustomCharacterImageUse("direct")
+                            }
+                          />
+                          <label htmlFor="custom-direct">
+                            Use Image Directly
+                          </label>
+                          <input
+                            type="radio"
+                            id="custom-desc"
+                            name="customImageUse"
+                            value="description"
+                            checked={customCharacterImageUse === "description"}
+                            onChange={() =>
+                              setCustomCharacterImageUse("description")
+                            }
+                          />
+                          <label htmlFor="custom-desc">
+                            Use Image Description
+                          </label>
+                        </div>
+                      </div>
+                    </>
+                  )}
+                </>
+              )}
+            </LessonSettingsPanel>
+
             <GenerationActionsPanel
               isLoading={isLoading}
               status={status}
@@ -347,6 +500,7 @@ const ReteachModePage = () => {
               handleGenerateImages={handleGenerateImages}
               handlePreview={() => setIsPreviewVisible(true)}
               title="3. Create Reteach Lesson"
+              generateButtonText="Create Lesson Plan"
             />
           </>
         )}
