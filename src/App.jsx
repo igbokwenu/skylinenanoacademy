@@ -17,8 +17,6 @@ function App() {
 
   const { downloadStatus } = useMonitorDownload();
 
-  const location = useLocation();
-
   useEffect(() => {
     if ("LanguageModel" in self || "Writer" in self) {
       setApiSupportStatus("On-device AI support detected.");
@@ -28,22 +26,6 @@ function App() {
       );
     }
   }, []);
-
-  const getPageTitle = () => {
-    switch (location.pathname) {
-      case "/lesson-creator":
-        return "Robust On-Device AI - Lesson Creator";
-      case "/browse-lessons": // Add this case
-        return "Robust On-Device AI - Browse Lessons";
-      case "/firebase-ai":
-        return "Robust On-Device AI - Firebase AI";
-
-      case "/":
-
-      default:
-        return "Robust On-Device AI - Home";
-    }
-  };
 
   return (
     <div className="container">
@@ -55,7 +37,7 @@ function App() {
             to="/"
             className={({ isActive }) => (isActive ? "nav-active" : "")}
           >
-            API Playground
+            Home
           </NavLink>
 
           <NavLink
@@ -78,13 +60,6 @@ function App() {
           >
             Browse Lessons
           </NavLink>
-
-          <NavLink
-            to="/firebase-ai"
-            className={({ isActive }) => (isActive ? "nav-active" : "")}
-          >
-            Firebase AI
-          </NavLink>
         </nav>
 
         <div className="status-bar">
@@ -98,7 +73,6 @@ function App() {
           <Route path="/lesson-creator" element={<LessonCreatorPage />} />
           <Route path="/reteach-mode" element={<ReteachModePage />} />
           <Route path="/browse-lessons" element={<BrowseLessonsPage />} />
-          <Route path="/firebase-ai" element={<FirebaseAiPage />} />{" "}
           {/* Add the new route */}
         </Routes>
       </main>
