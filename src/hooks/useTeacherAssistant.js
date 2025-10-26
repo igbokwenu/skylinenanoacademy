@@ -118,12 +118,27 @@ export const useTeacherAssistant = () => {
     [executeTranscription]
   );
 
+  // ******** FIXED: DEFINED stopRecording BEFORE startRecording ********
+  const stopRecording = useCallback(() => {
+    if (
+      mediaRecorderRef.current &&
+      mediaRecorderRef.current.state === "recording"
+    ) {
+      setIsRecording(false);
+      setIsProcessing(true);
+      setStatusMessage("Finalizing transcription...");
+      mediaRecorderRef.current.stop();
+      if (recordingTimerRef.current) {
+        clearTimeout(recordingTimerRef.current);
+      }
+    }
+  }, []);
+
   const startRecording = useCallback(async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       audioStreamRef.current = stream;
 
-      // Reset state for new session
       setTranscription("");
       setSummary("");
       setKeyPoints("");
@@ -139,13 +154,11 @@ export const useTeacherAssistant = () => {
 
       recorder.ondataavailable = async (event) => {
         if (event.data.size > 0) {
-          const tempStatus = statusMessage;
           setStatusMessage(`Transcribing chunk...`);
           const newTranscript = await transcribeChunk(event.data);
           setTranscription((prev) => `${prev} ${newTranscript}`.trim());
-          // Set status back to recording only if it's still supposed to be recording
           if (mediaRecorderRef.current?.state === "recording") {
-            setStatusMessage(tempStatus);
+            setStatusMessage("Recording...");
           }
         }
       };
@@ -166,28 +179,13 @@ export const useTeacherAssistant = () => {
       console.error("Mic access error:", err);
     }
   }, [stopRecording, transcribeChunk]);
-
-  const stopRecording = useCallback(() => {
-    if (
-      mediaRecorderRef.current &&
-      mediaRecorderRef.current.state === "recording"
-    ) {
-      setIsRecording(false); // UI should reflect that recording has stopped
-      setIsProcessing(true); // Now we are in the processing phase
-      setStatusMessage("Finalizing transcription...");
-      mediaRecorderRef.current.stop(); // This will trigger ondataavailable then onstop
-      if (recordingTimerRef.current) {
-        clearTimeout(recordingTimerRef.current);
-      }
-    }
-  }, []);
+  // ********************************************************************
 
   const handleFileUpload = useCallback(
     async (file) => {
       if (!file) return;
 
       setIsProcessing(true);
-      // Reset state for new session
       setTranscription("");
       setSummary("");
       setKeyPoints("");
@@ -207,7 +205,6 @@ export const useTeacherAssistant = () => {
         const numChunks = Math.ceil(duration / AUDIO_CHUNK_DURATION_S);
 
         let fullTranscript = "";
-        // Use a proper async loop to process chunks sequentially
         for (let i = 0; i < numChunks; i++) {
           setStatusMessage(`Processing chunk ${i + 1} of ${numChunks}...`);
           const chunkStart = i * chunkFrames;
@@ -232,9 +229,9 @@ export const useTeacherAssistant = () => {
           const blob = new Blob([wavBuffer], { type: "audio/wav" });
 
           setStatusMessage(`Transcribing chunk ${i + 1} of ${numChunks}...`);
-          const transcriptChunk = await transcribeChunk(blob); // Await the result
+          const transcriptChunk = await transcribeChunk(blob);
           fullTranscript += ` ${transcriptChunk}`;
-          setTranscription(fullTranscript.trim()); // Update UI progressively
+          setTranscription(fullTranscript.trim());
         }
 
         setStatusMessage("Transcription complete. Ready for analysis.");
@@ -248,7 +245,6 @@ export const useTeacherAssistant = () => {
     [transcribeChunk]
   );
 
-  // --- ANALYSIS AND SAVE FUNCTIONS (Unchanged, but now they will work) ---
   const analyzeText = async (type) => {
     if (!transcription) {
       setStatusMessage("No transcription available to analyze.");
