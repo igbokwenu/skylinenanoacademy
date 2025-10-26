@@ -1,0 +1,24 @@
+/* src/pages/TeacherAssistantPage.css */
+
+.ta-page-container .lc-header {
+  text-align: center;
+  margin-bottom: 30px;
+}
+
+.ta-page-container .lc-header h3 {
+  font-size: 2em;
+  color: #333;
+}
+
+.ta-page-container .lc-header p {
+  font-size: 1.1em;
+  color: #666;
+  max-width: 600px;
+  margin: 10px auto 0;
+}
+
+.ta-main {
+  display: flex;
+  flex-direction: column;
+  gap: 25px;
+}
