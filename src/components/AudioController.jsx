@@ -12,13 +12,13 @@ const AudioController = ({
 }) => {
   const canvasRef = useRef(null);
   const animationFrameRef = useRef(null);
-  const audioStreamRef = useRef(null);
+  const audioStreamForVizRef = useRef(null); // Separate stream for visualization
 
   useEffect(() => {
     let audioContext, analyser, source;
 
     const setupWaveform = (stream) => {
-      audioStreamRef.current = stream;
+      audioStreamForVizRef.current = stream; // Store the stream to stop it later
       audioContext = new (window.AudioContext || window.webkitAudioContext)();
       analyser = audioContext.createAnalyser();
       source = audioContext.createMediaStreamSource(stream);
@@ -33,14 +33,11 @@ const AudioController = ({
       const draw = () => {
         animationFrameRef.current = requestAnimationFrame(draw);
         analyser.getByteFrequencyData(dataArray);
-
         canvasCtx.fillStyle = "#f0f2f5";
         canvasCtx.fillRect(0, 0, canvas.width, canvas.height);
-
         const barWidth = (canvas.width / bufferLength) * 2.5;
         let barHeight;
         let x = 0;
-
         for (let i = 0; i < bufferLength; i++) {
           barHeight = dataArray[i] / 2;
           canvasCtx.fillStyle = "#0c64e4";
@@ -52,18 +49,32 @@ const AudioController = ({
     };
 
     if (isRecording) {
-      // We only need to set up the waveform, the stream is handled by the hook now
       navigator.mediaDevices.getUserMedia({ audio: true }).then(setupWaveform);
+    } else {
+      // Cleanup when not recording
+      if (animationFrameRef.current)
+        cancelAnimationFrame(animationFrameRef.current);
+      audioStreamForVizRef.current
+        ?.getTracks()
+        .forEach((track) => track.stop());
+      if (canvasRef.current) {
+        const canvasCtx = canvasRef.current.getContext("2d");
+        canvasCtx.clearRect(
+          0,
+          0,
+          canvasRef.current.width,
+          canvasRef.current.height
+        );
+      }
     }
 
+    // Cleanup on component unmount
     return () => {
-      if (animationFrameRef.current) {
+      if (animationFrameRef.current)
         cancelAnimationFrame(animationFrameRef.current);
-      }
-      audioStreamRef.current?.getTracks().forEach((track) => track.stop());
-      if (audioContext) {
-        audioContext.close();
-      }
+      audioStreamForVizRef.current
+        ?.getTracks()
+        .forEach((track) => track.stop());
     };
   }, [isRecording]);
 
@@ -71,10 +82,10 @@ const AudioController = ({
     const file = e.target.files?.[0];
     if (file) {
       handleFileUpload(file);
+      e.target.value = null; // Reset file input
     }
   };
 
-  // Dynamic button text and action
   const getButtonProps = () => {
     if (isProcessing) {
       return {
@@ -114,13 +125,18 @@ const AudioController = ({
           {buttonProps.text}
         </button>
         <div className="upload-wrapper">
-          <label htmlFor="audio-upload" className="upload-btn">
+          <label
+            htmlFor="audio-upload"
+            className={`upload-btn ${
+              isRecording || isProcessing ? "disabled" : ""
+            }`}
+          >
             Or Upload Audio File
           </label>
           <input
             id="audio-upload"
             type="file"
-            accept="audio/*"
+            accept="audio/*,video/*"
             onChange={onFileChange}
             disabled={isRecording || isProcessing}
             style={{ display: "none" }}

@@ -81,3 +81,21 @@
   background-color: #6c757d; /* Gray for processing */
   cursor: wait;
 }
+.join-btn.recording {
+  background-color: #dc3545; /* Red for stop/end */
+}
+
+.join-btn.recording:hover {
+  background-color: #c82333;
+}
+
+.join-btn.processing {
+  background-color: #6c757d; /* Gray for processing */
+  cursor: wait;
+}
+
+.upload-btn.disabled {
+  background-color: #a0a0a0;
+  cursor: not-allowed;
+  color: #e0e0e0;
+}
