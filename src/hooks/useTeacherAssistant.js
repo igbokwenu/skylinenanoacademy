@@ -1,29 +1,26 @@
 // src/hooks/useTeacherAssistant.js
 
 import { useState, useRef, useCallback } from "react";
-import { useLanguageModel } from "./useLanguageModel";
+import { useLanguageModel } from "./useLanguageModel"; // We still use this for Summarizer, etc.
 import { db } from "../lib/db";
 
 // --- CONFIGURATION ---
-const CHUNK_SECONDS = 29; // Stay safely under the 30s limit
+const CHUNK_SECONDS = 29;
 
-// --- AUDIO PROCESSING LOGIC (Directly from audio-splitter.html) ---
-// This is the proven code for chunking and encoding audio.
+// --- AUDIO PROCESSING UTILITIES (Proven from examples) ---
 function writeString(view, offset, str) {
   for (let i = 0; i < str.length; i++) {
     view.setUint8(offset + i, str.charCodeAt(i));
   }
 }
-
 function encodeWavPCM16(audioBuffer) {
-  const numChannels = audioBuffer.numberOfChannels;
-  const sampleRate = audioBuffer.sampleRate;
-  const frames = audioBuffer.length;
+  const numChannels = audioBuffer.numberOfChannels,
+    sampleRate = audioBuffer.sampleRate,
+    frames = audioBuffer.length;
   const interleaved = new Int16Array(frames * numChannels);
   const channelData = Array.from({ length: numChannels }, (_, ch) =>
     audioBuffer.getChannelData(ch)
   );
-
   let w = 0;
   for (let i = 0; i < frames; i++) {
     for (let ch = 0; ch < numChannels; ch++) {
@@ -31,15 +28,13 @@ function encodeWavPCM16(audioBuffer) {
       interleaved[w++] = s < 0 ? s * 0x8000 : s * 0x7fff;
     }
   }
-
-  const bytesPerSample = 2;
-  const blockAlign = numChannels * bytesPerSample;
-  const byteRate = sampleRate * blockAlign;
-  const dataSize = interleaved.byteLength;
-  const headerSize = 44;
+  const bytesPerSample = 2,
+    blockAlign = numChannels * bytesPerSample,
+    byteRate = sampleRate * blockAlign,
+    dataSize = interleaved.byteLength,
+    headerSize = 44;
   const buf = new ArrayBuffer(headerSize + dataSize);
   const view = new DataView(buf);
-
   writeString(view, 0, "RIFF");
   view.setUint32(4, 36 + dataSize, true);
   writeString(view, 8, "WAVE");
@@ -54,12 +49,10 @@ function encodeWavPCM16(audioBuffer) {
   writeString(view, 36, "data");
   view.setUint32(40, dataSize, true);
   new Int16Array(buf, headerSize).set(interleaved);
-
   return buf;
 }
 
 export const useTeacherAssistant = () => {
-  // --- STATE AND REFS ---
   const [isRecording, setIsRecording] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [statusMessage, setStatusMessage] = useState("Ready to start.");
@@ -67,6 +60,7 @@ export const useTeacherAssistant = () => {
   const [lessonTitle, setLessonTitle] = useState(
     `Lesson ${new Date().toLocaleDateString()}`
   );
+  // ... other state variables
   const [summary, setSummary] = useState("");
   const [keyPoints, setKeyPoints] = useState("");
   const [condensedLesson, setCondensedLesson] = useState("");
@@ -76,11 +70,9 @@ export const useTeacherAssistant = () => {
 
   const mediaRecorderRef = useRef(null);
   const audioChunksRef = useRef([]);
+  const languageModelSessionRef = useRef(null); // Ref to hold a reusable session
 
-  // --- GEMINI NANO HOOKS ---
-  const { executePrompt: executeTranscription } = useLanguageModel({
-    apiName: "LanguageModel",
-  });
+  // Hooks for analysis APIs (these are fine)
   const { executePrompt: executeSummarize } = useLanguageModel({
     apiName: "Summarizer",
   });
@@ -91,60 +83,68 @@ export const useTeacherAssistant = () => {
     apiName: "Writer",
   });
 
-  // --- CORE LOGIC: COMBINING THE EXAMPLES ---
-
   /**
-   * Transcribes a single audio blob.
-   * Logic is from mediarecorder-audio-prompt/script.js
+   * Dedicated, robust transcription function modeled DIRECTLY on the working example.
+   * This is the core fix. It creates and manages its own session.
    */
-  const transcribeChunk = useCallback(
-    async (blob) => {
-      try {
-        const arrayBuffer = await blob.arrayBuffer();
-        // Using promptStreaming for potentially faster first-token responses
-        const stream = await executeTranscription(
-          [
-            {
-              role: "user",
-              content: [
-                { type: "text", value: "Transcribe this audio accurately." },
-                { type: "audio", value: arrayBuffer },
-              ],
-            },
-          ],
-          { expectedInputs: [{ type: "audio" }] }
-        );
-
-        let fullResponse = "";
-        // The hook's executePrompt already handles streaming, so we just await the final result.
-        if (stream) {
-          fullResponse = await stream;
+  const transcribeAudioChunk = useCallback(async (blob) => {
+    try {
+      // Ensure a session exists, creating one if necessary.
+      if (!languageModelSessionRef.current) {
+        if (!("LanguageModel" in self)) {
+          throw new Error("LanguageModel API not supported.");
         }
-        return fullResponse || "";
-      } catch (error) {
-        console.error("Transcription error for chunk:", error);
-        return `[Error Transcribing Chunk: ${error.message}]`;
+        languageModelSessionRef.current = await self.LanguageModel.create({
+          expectedInputs: [{ type: "audio" }],
+        });
       }
-    },
-    [executeTranscription]
-  );
+
+      const arrayBuffer = await blob.arrayBuffer();
+      const stream = await languageModelSessionRef.current.promptStreaming([
+        {
+          role: "user",
+          content: [
+            { type: "text", value: "Transcribe this audio accurately." },
+            { type: "audio", value: arrayBuffer },
+          ],
+        },
+      ]);
+
+      let fullResponse = "";
+      for await (const chunk of stream) {
+        fullResponse += chunk;
+      }
+      return fullResponse;
+    } catch (error) {
+      console.error("Transcription chunk failed:", error);
+      setStatusMessage(`Error: ${error.message}`);
+      // Destroy session on error so it can be re-created
+      if (languageModelSessionRef.current) {
+        languageModelSessionRef.current.destroy();
+        languageModelSessionRef.current = null;
+      }
+      return "[TRANSCRIPTION ERROR]";
+    }
+  }, []);
+
+  const resetStateForNewJob = () => {
+    setTranscription("");
+    setSummary("");
+    setKeyPoints("");
+    setCondensedLesson("");
+    setHomework("");
+    setQuiz("");
+    setLessonCreatorPrompt("");
+  };
 
   /**
-   * The main engine. Takes any audio blob, splits it, and transcribes sequentially.
+   * The main engine for processing audio from any source (file or recording).
    */
-  const processAndTranscribeAudioBlob = useCallback(
+  const processAudio = useCallback(
     async (blob) => {
+      resetStateForNewJob();
       setIsProcessing(true);
-      // Clear all previous results for a new session
-      setTranscription("");
-      setSummary("");
-      setKeyPoints("");
-      setCondensedLesson("");
-      setHomework("");
-      setQuiz("");
-      setLessonCreatorPrompt("");
-
-      setStatusMessage("Step 1: Decoding audio file...");
+      setStatusMessage("Step 1/3: Decoding audio...");
 
       try {
         const arrayBuffer = await blob.arrayBuffer();
@@ -152,88 +152,86 @@ export const useTeacherAssistant = () => {
         const audioBuffer = await ac.decodeAudioData(arrayBuffer);
 
         const { sampleRate, numberOfChannels, duration } = audioBuffer;
-        const chunkFrames = Math.floor(CHUNK_SECONDS * sampleRate);
-        const numChunks = Math.ceil(duration / CHUNK_SECONDS);
+        const totalChunks = Math.max(1, Math.ceil(duration / CHUNK_SECONDS));
 
-        setStatusMessage(
-          `Step 2: Sliced audio into ${numChunks} chunk(s). Starting transcription...`
-        );
+        setStatusMessage(`Step 2/3: Slicing into ${totalChunks} chunk(s)...`);
+        const chunksToProcess = [];
+        for (let i = 0; i < totalChunks; i++) {
+          const start = i * CHUNK_SECONDS;
+          const end = Math.min((i + 1) * CHUNK_SECONDS, duration);
+          const chunkDuration = end - start;
 
-        let fullTranscript = "";
-        for (let i = 0; i < numChunks; i++) {
-          const chunkStart = i * chunkFrames;
-          const thisFrames = Math.min(
-            chunkFrames,
-            audioBuffer.length - chunkStart
-          );
+          const chunkStartFrame = Math.floor(start * sampleRate);
+          const framesInChunk = Math.floor(chunkDuration * sampleRate);
 
-          const chunkAB = new AudioBuffer({
+          const chunkBuffer = ac.createBuffer(
             numberOfChannels,
-            length: thisFrames,
-            sampleRate,
-          });
-          for (let ch = 0; ch < numberOfChannels; ch++) {
-            const src = audioBuffer
-              .getChannelData(ch)
-              .subarray(chunkStart, chunkStart + thisFrames);
-            chunkAB.copyToChannel(src, ch, 0);
-          }
-
-          const wavBuffer = encodeWavPCM16(chunkAB);
-          const wavBlob = new Blob([wavBuffer], { type: "audio/wav" });
-
-          setStatusMessage(
-            `Step 3: Transcribing chunk ${i + 1} of ${numChunks}...`
+            framesInChunk,
+            sampleRate
           );
-          const transcriptChunk = await transcribeChunk(wavBlob); // Await the result of one chunk
-          fullTranscript += ` ${transcriptChunk}`;
-          setTranscription(fullTranscript.trim()); // Update UI progressively
+          for (let ch = 0; ch < numberOfChannels; ch++) {
+            const sourceData = audioBuffer.getChannelData(ch);
+            const chunkData = sourceData.subarray(
+              chunkStartFrame,
+              chunkStartFrame + framesInChunk
+            );
+            chunkBuffer.copyToChannel(chunkData, ch, 0);
+          }
+          const wavBuffer = encodeWavPCM16(chunkBuffer);
+          chunksToProcess.push(new Blob([wavBuffer], { type: "audio/wav" }));
+        }
+
+        // The reliable, sequential processing loop
+        let fullTranscript = "";
+        for (const [index, chunk] of chunksToProcess.entries()) {
+          setStatusMessage(
+            `Step 3/3: Transcribing chunk ${index + 1} of ${totalChunks}...`
+          );
+          const transcriptPart = await transcribeAudioChunk(chunk); // Await each chunk
+          fullTranscript += ` ${transcriptPart}`;
+          setTranscription(fullTranscript.trim());
         }
 
         setStatusMessage("Transcription complete. Ready for analysis.");
       } catch (error) {
-        setStatusMessage(
-          `Critical Error: ${error.message}. Please try a different audio file.`
-        );
-        console.error("Full audio processing failed:", error);
+        console.error("Audio processing failed:", error);
+        setStatusMessage(`Error during processing: ${error.message}`);
       } finally {
         setIsProcessing(false);
       }
     },
-    [transcribeChunk]
+    [transcribeAudioChunk]
   );
-
-  // --- UI-FACING HANDLERS ---
 
   const startRecording = useCallback(async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      resetStateForNewJob();
       audioChunksRef.current = [];
-      const recorder = new MediaRecorder(stream, { mimeType: "audio/webm" });
+
+      const recorder = new MediaRecorder(stream);
       mediaRecorderRef.current = recorder;
 
-      recorder.ondataavailable = (event) => {
-        if (event.data.size > 0) audioChunksRef.current.push(event.data);
+      recorder.ondataavailable = (e) => {
+        if (e.data.size > 0) audioChunksRef.current.push(e.data);
       };
 
       recorder.onstop = () => {
         stream.getTracks().forEach((track) => track.stop());
-        const fullAudioBlob = new Blob(audioChunksRef.current, {
+        const recordedBlob = new Blob(audioChunksRef.current, {
           type: "audio/webm",
         });
-        processAndTranscribeAudioBlob(fullAudioBlob);
+        processAudio(recordedBlob);
       };
 
       recorder.start();
       setIsRecording(true);
-      setStatusMessage('Recording... Click "End Lesson" to stop and process.');
+      setStatusMessage('Recording... Click "End Lesson" to process.');
     } catch (err) {
-      setStatusMessage(
-        "Microphone access denied. Please check browser permissions."
-      );
-      console.error("Mic access error:", err);
+      setStatusMessage("Microphone access denied. Please check permissions.");
+      console.error(err);
     }
-  }, [processAndTranscribeAudioBlob]);
+  }, [processAudio]);
 
   const stopRecording = useCallback(() => {
     if (
@@ -242,24 +240,22 @@ export const useTeacherAssistant = () => {
     ) {
       mediaRecorderRef.current.stop();
       setIsRecording(false);
+      // The onstop handler will trigger the rest of the process.
     }
   }, []);
 
   const handleFileUpload = useCallback(
     (file) => {
-      if (file) {
-        processAndTranscribeAudioBlob(file);
-      }
+      if (file) processAudio(file);
     },
-    [processAndTranscribeAudioBlob]
+    [processAudio]
   );
 
-  // --- POST-TRANSCRIPTION ANALYSIS (No changes needed here) ---
+  // --- ANALYSIS AND SAVE FUNCTIONS (Unchanged, now they will work) ---
   const analyzeText = async (type) => {
     if (!transcription || isProcessing) return;
     setIsProcessing(true);
     try {
-      // ... (existing analysis logic is fine)
       switch (type) {
         case "summary":
           setStatusMessage("Generating summary...");
