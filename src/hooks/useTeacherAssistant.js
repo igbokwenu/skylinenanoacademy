@@ -5,8 +5,6 @@ import { useLanguageModel } from "./useLanguageModel";
 import { db } from "../lib/db";
 
 // --- CONFIGURATION ---
-const MAX_RECORDING_HOURS = 3;
-const MAX_RECORDING_MS = MAX_RECORDING_HOURS * 60 * 60 * 1000;
 const AUDIO_CHUNK_DURATION_S = 29; // 29 seconds to be safe with the 30s limit
 const AUDIO_CHUNK_DURATION_MS = AUDIO_CHUNK_DURATION_S * 1000;
 
@@ -61,6 +59,7 @@ function encodeWavPCM16(audioBuffer) {
 }
 
 export const useTeacherAssistant = () => {
+  // --- STATE MANAGEMENT ---
   const [isRecording, setIsRecording] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [statusMessage, setStatusMessage] = useState("Ready to start.");
@@ -68,6 +67,7 @@ export const useTeacherAssistant = () => {
   const [lessonTitle, setLessonTitle] = useState(
     `Lesson ${new Date().toLocaleDateString()}`
   );
+  // ... other state variables
   const [summary, setSummary] = useState("");
   const [keyPoints, setKeyPoints] = useState("");
   const [condensedLesson, setCondensedLesson] = useState("");
@@ -75,6 +75,7 @@ export const useTeacherAssistant = () => {
   const [quiz, setQuiz] = useState("");
   const [lessonCreatorPrompt, setLessonCreatorPrompt] = useState("");
 
+  // --- GEMINI HOOKS ---
   const { executePrompt: executeTranscription } = useLanguageModel({
     apiName: "LanguageModel",
   });
@@ -88,11 +89,13 @@ export const useTeacherAssistant = () => {
     apiName: "Writer",
   });
 
+  // --- REFS ---
   const mediaRecorderRef = useRef(null);
-  const audioStreamRef = useRef(null);
-  const recordingTimerRef = useRef(null);
+  const audioChunksRef = useRef([]);
 
-  const transcribeChunk = useCallback(
+  // --- CORE TRANSCRIPTION AND PROCESSING LOGIC ---
+
+  const transcribeSingleChunk = useCallback(
     async (audioBlob) => {
       try {
         const arrayBuffer = await audioBlob.arrayBuffer();
@@ -118,138 +121,126 @@ export const useTeacherAssistant = () => {
     [executeTranscription]
   );
 
-  // ******** FIXED: DEFINED stopRecording BEFORE startRecording ********
-  const stopRecording = useCallback(() => {
-    if (
-      mediaRecorderRef.current &&
-      mediaRecorderRef.current.state === "recording"
-    ) {
-      setIsRecording(false);
+  const processAudioBlob = useCallback(
+    async (blob) => {
       setIsProcessing(true);
-      setStatusMessage("Finalizing transcription...");
-      mediaRecorderRef.current.stop();
-      if (recordingTimerRef.current) {
-        clearTimeout(recordingTimerRef.current);
-      }
-    }
-  }, []);
-
-  const startRecording = useCallback(async () => {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      audioStreamRef.current = stream;
-
       setTranscription("");
+      // Clear previous results
       setSummary("");
       setKeyPoints("");
       setCondensedLesson("");
       setHomework("");
       setQuiz("");
       setLessonCreatorPrompt("");
-      setIsRecording(true);
-      setStatusMessage("Recording...");
 
-      const recorder = new MediaRecorder(stream);
+      setStatusMessage("Decoding audio...");
+
+      try {
+        const arrayBuffer = await blob.arrayBuffer();
+        const ac = new (window.AudioContext || window.webkitAudioContext)();
+        const audioBuffer = await ac.decodeAudioData(arrayBuffer);
+
+        const { sampleRate, numberOfChannels, duration } = audioBuffer;
+        const totalChunks = Math.ceil(duration / AUDIO_CHUNK_DURATION_S);
+
+        let fullTranscript = "";
+        for (let i = 0; i < totalChunks; i++) {
+          const chunkStartFrame = i * AUDIO_CHUNK_DURATION_S * sampleRate;
+          const chunkEndFrame =
+            chunkStartFrame + AUDIO_CHUNK_DURATION_S * sampleRate;
+          const framesInChunk =
+            Math.min(chunkEndFrame, audioBuffer.length) - chunkStartFrame;
+
+          const chunkBuffer = ac.createBuffer(
+            numberOfChannels,
+            framesInChunk,
+            sampleRate
+          );
+          for (let ch = 0; ch < numberOfChannels; ch++) {
+            const sourceData = audioBuffer.getChannelData(ch);
+            const chunkData = sourceData.subarray(
+              chunkStartFrame,
+              chunkStartFrame + framesInChunk
+            );
+            chunkBuffer.copyToChannel(chunkData, ch);
+          }
+
+          setStatusMessage(`Transcribing chunk ${i + 1} of ${totalChunks}...`);
+          const wavBuffer = encodeWavPCM16(chunkBuffer);
+          const wavBlob = new Blob([wavBuffer], { type: "audio/wav" });
+
+          const transcriptChunk = await transcribeSingleChunk(wavBlob);
+          fullTranscript += ` ${transcriptChunk}`;
+          setTranscription(fullTranscript.trim());
+        }
+        setStatusMessage("Transcription complete. Ready for analysis.");
+      } catch (error) {
+        setStatusMessage(`Audio processing failed: ${error.message}`);
+        console.error("Audio processing error:", error);
+      } finally {
+        setIsProcessing(false);
+      }
+    },
+    [transcribeSingleChunk]
+  );
+
+  // --- PUBLIC HANDLER FUNCTIONS ---
+
+  const startRecording = useCallback(async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      audioChunksRef.current = []; // Clear previous chunks
+
+      const recorder = new MediaRecorder(stream, { mimeType: "audio/webm" });
       mediaRecorderRef.current = recorder;
 
-      recorder.ondataavailable = async (event) => {
+      recorder.ondataavailable = (event) => {
         if (event.data.size > 0) {
-          setStatusMessage(`Transcribing chunk...`);
-          const newTranscript = await transcribeChunk(event.data);
-          setTranscription((prev) => `${prev} ${newTranscript}`.trim());
-          if (mediaRecorderRef.current?.state === "recording") {
-            setStatusMessage("Recording...");
-          }
+          audioChunksRef.current.push(event.data);
         }
       };
 
-      recorder.onstop = () => {
-        audioStreamRef.current?.getTracks().forEach((track) => track.stop());
-        setIsRecording(false);
-        setIsProcessing(false);
-        setStatusMessage("Transcription complete. Ready for analysis.");
+      recorder.onstop = async () => {
+        stream.getTracks().forEach((track) => track.stop());
+        const fullAudioBlob = new Blob(audioChunksRef.current, {
+          type: "audio/webm",
+        });
+        await processAudioBlob(fullAudioBlob);
       };
 
       recorder.start(AUDIO_CHUNK_DURATION_MS);
-      recordingTimerRef.current = setTimeout(stopRecording, MAX_RECORDING_MS);
+      setIsRecording(true);
+      setStatusMessage("Recording...");
     } catch (err) {
       setStatusMessage(
         "Error: Could not access microphone. Please check permissions."
       );
       console.error("Mic access error:", err);
     }
-  }, [stopRecording, transcribeChunk]);
-  // ********************************************************************
+  }, [processAudioBlob]);
+
+  const stopRecording = useCallback(() => {
+    if (
+      mediaRecorderRef.current &&
+      mediaRecorderRef.current.state === "recording"
+    ) {
+      mediaRecorderRef.current.stop(); // This triggers onstop, which handles the rest
+      setIsRecording(false);
+      setIsProcessing(true); // Switch to processing state immediately
+      setStatusMessage("Processing recorded audio...");
+    }
+  }, []);
 
   const handleFileUpload = useCallback(
     async (file) => {
       if (!file) return;
-
-      setIsProcessing(true);
-      setTranscription("");
-      setSummary("");
-      setKeyPoints("");
-      setCondensedLesson("");
-      setHomework("");
-      setQuiz("");
-      setLessonCreatorPrompt("");
-      setStatusMessage("Decoding audio file...");
-
-      try {
-        const arrayBuffer = await file.arrayBuffer();
-        const ac = new (window.AudioContext || window.webkitAudioContext)();
-        const audioBuffer = await ac.decodeAudioData(arrayBuffer);
-
-        const { sampleRate, numberOfChannels, duration } = audioBuffer;
-        const chunkFrames = Math.floor(AUDIO_CHUNK_DURATION_S * sampleRate);
-        const numChunks = Math.ceil(duration / AUDIO_CHUNK_DURATION_S);
-
-        let fullTranscript = "";
-        for (let i = 0; i < numChunks; i++) {
-          setStatusMessage(`Processing chunk ${i + 1} of ${numChunks}...`);
-          const chunkStart = i * chunkFrames;
-          const thisFrames = Math.min(
-            chunkFrames,
-            audioBuffer.length - chunkStart
-          );
-
-          const chunkAB = ac.createBuffer(
-            numberOfChannels,
-            thisFrames,
-            sampleRate
-          );
-          for (let ch = 0; ch < numberOfChannels; ch++) {
-            const src = audioBuffer
-              .getChannelData(ch)
-              .subarray(chunkStart, chunkStart + thisFrames);
-            chunkAB.copyToChannel(src, ch, 0);
-          }
-
-          const wavBuffer = encodeWavPCM16(chunkAB);
-          const blob = new Blob([wavBuffer], { type: "audio/wav" });
-
-          setStatusMessage(`Transcribing chunk ${i + 1} of ${numChunks}...`);
-          const transcriptChunk = await transcribeChunk(blob);
-          fullTranscript += ` ${transcriptChunk}`;
-          setTranscription(fullTranscript.trim());
-        }
-
-        setStatusMessage("Transcription complete. Ready for analysis.");
-      } catch (error) {
-        setStatusMessage(`File processing failed: ${error.message}`);
-        console.error("File upload processing error:", error);
-      } finally {
-        setIsProcessing(false);
-      }
+      await processAudioBlob(file);
     },
-    [transcribeChunk]
+    [processAudioBlob]
   );
 
   const analyzeText = async (type) => {
-    if (!transcription) {
-      setStatusMessage("No transcription available to analyze.");
-      return;
-    }
+    if (!transcription || isProcessing) return;
     setIsProcessing(true);
     try {
       switch (type) {
@@ -295,32 +286,32 @@ export const useTeacherAssistant = () => {
           setLessonCreatorPrompt(lpResult);
           break;
         default:
+          setStatusMessage("Unknown analysis type.");
           break;
       }
+      setStatusMessage("Analysis complete.");
     } catch (error) {
       setStatusMessage(`Error during analysis: ${error.message}`);
     } finally {
       setIsProcessing(false);
-      setStatusMessage("Analysis complete.");
     }
   };
 
   const saveLesson = async () => {
     if (!transcription) return;
     setStatusMessage("Saving lesson...");
-    const newLesson = {
-      createdAt: new Date(),
-      title: lessonTitle,
-      transcription,
-      summary,
-      keyPoints,
-      condensedLesson,
-      homework,
-      quiz,
-      lessonCreatorPrompt,
-    };
     try {
-      await db.teacherAssistantLessons.add(newLesson);
+      await db.teacherAssistantLessons.add({
+        createdAt: new Date(),
+        title: lessonTitle,
+        transcription,
+        summary,
+        keyPoints,
+        condensedLesson,
+        homework,
+        quiz,
+        lessonCreatorPrompt,
+      });
       setStatusMessage("Lesson saved successfully!");
     } catch (error) {
       setStatusMessage(`Failed to save lesson: ${error.message}`);
