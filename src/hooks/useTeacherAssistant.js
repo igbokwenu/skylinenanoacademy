@@ -1,7 +1,7 @@
 // src/hooks/useTeacherAssistant.js
 
-import { useState, useRef, useCallback } from "react";
-import { useLanguageModel } from "./useLanguageModel"; // We still use this for Summarizer, etc.
+import { useState, useRef, useCallback, useEffect } from "react";
+import { useLanguageModel } from "./useLanguageModel";
 import { db } from "../lib/db";
 
 // --- CONFIGURATION ---
@@ -60,7 +60,6 @@ export const useTeacherAssistant = () => {
   const [lessonTitle, setLessonTitle] = useState(
     `Lesson ${new Date().toLocaleDateString()}`
   );
-  // ... other state variables
   const [summary, setSummary] = useState("");
   const [keyPoints, setKeyPoints] = useState("");
   const [condensedLesson, setCondensedLesson] = useState("");
@@ -70,9 +69,8 @@ export const useTeacherAssistant = () => {
 
   const mediaRecorderRef = useRef(null);
   const audioChunksRef = useRef([]);
-  const languageModelSessionRef = useRef(null); // Ref to hold a reusable session
+  const languageModelSessionRef = useRef(null);
 
-  // Hooks for analysis APIs (these are fine)
   const { executePrompt: executeSummarize } = useLanguageModel({
     apiName: "Summarizer",
   });
@@ -83,22 +81,15 @@ export const useTeacherAssistant = () => {
     apiName: "Writer",
   });
 
-  /**
-   * Dedicated, robust transcription function modeled DIRECTLY on the working example.
-   * This is the core fix. It creates and manages its own session.
-   */
   const transcribeAudioChunk = useCallback(async (blob) => {
     try {
-      // Ensure a session exists, creating one if necessary.
       if (!languageModelSessionRef.current) {
-        if (!("LanguageModel" in self)) {
+        if (!("LanguageModel" in self))
           throw new Error("LanguageModel API not supported.");
-        }
         languageModelSessionRef.current = await self.LanguageModel.create({
           expectedInputs: [{ type: "audio" }],
         });
       }
-
       const arrayBuffer = await blob.arrayBuffer();
       const stream = await languageModelSessionRef.current.promptStreaming([
         {
@@ -109,7 +100,6 @@ export const useTeacherAssistant = () => {
           ],
         },
       ]);
-
       let fullResponse = "";
       for await (const chunk of stream) {
         fullResponse += chunk;
@@ -118,7 +108,6 @@ export const useTeacherAssistant = () => {
     } catch (error) {
       console.error("Transcription chunk failed:", error);
       setStatusMessage(`Error: ${error.message}`);
-      // Destroy session on error so it can be re-created
       if (languageModelSessionRef.current) {
         languageModelSessionRef.current.destroy();
         languageModelSessionRef.current = null;
@@ -127,43 +116,61 @@ export const useTeacherAssistant = () => {
     }
   }, []);
 
-  const resetStateForNewJob = () => {
-    setTranscription("");
-    setSummary("");
-    setKeyPoints("");
-    setCondensedLesson("");
-    setHomework("");
-    setQuiz("");
-    setLessonCreatorPrompt("");
-  };
+  // --- NEW: Function to run initial analysis automatically ---
+  const runInitialAnalysis = useCallback(
+    async (fullTranscript) => {
+      if (!fullTranscript) return;
+      try {
+        setStatusMessage("Generating summary...");
+        const summaryResult = await executeSummarize(fullTranscript, {
+          type: "tldr",
+          length: "long",
+        });
+        setSummary(summaryResult);
 
-  /**
-   * The main engine for processing audio from any source (file or recording).
-   */
+        setStatusMessage("Extracting key points...");
+        const pointsResult = await executeSummarize(fullTranscript, {
+          type: "key-points",
+          length: "long",
+        });
+        setKeyPoints(pointsResult);
+
+        setStatusMessage("Condensing lesson...");
+        const condensedResult = await executeRewrite(fullTranscript, {
+          length: "shorter",
+        });
+        setCondensedLesson(condensedResult);
+
+        setStatusMessage(
+          "Initial analysis complete. You can now generate follow-up materials."
+        );
+      } catch (error) {
+        console.error("Initial analysis failed:", error);
+        setStatusMessage(`Error during auto-analysis: ${error.message}`);
+      }
+    },
+    [executeSummarize, executeRewrite]
+  );
+
   const processAudio = useCallback(
     async (blob) => {
       resetStateForNewJob();
       setIsProcessing(true);
       setStatusMessage("Step 1/3: Decoding audio...");
-
       try {
         const arrayBuffer = await blob.arrayBuffer();
         const ac = new (window.AudioContext || window.webkitAudioContext)();
         const audioBuffer = await ac.decodeAudioData(arrayBuffer);
-
         const { sampleRate, numberOfChannels, duration } = audioBuffer;
         const totalChunks = Math.max(1, Math.ceil(duration / CHUNK_SECONDS));
-
         setStatusMessage(`Step 2/3: Slicing into ${totalChunks} chunk(s)...`);
         const chunksToProcess = [];
         for (let i = 0; i < totalChunks; i++) {
           const start = i * CHUNK_SECONDS;
           const end = Math.min((i + 1) * CHUNK_SECONDS, duration);
           const chunkDuration = end - start;
-
           const chunkStartFrame = Math.floor(start * sampleRate);
           const framesInChunk = Math.floor(chunkDuration * sampleRate);
-
           const chunkBuffer = ac.createBuffer(
             numberOfChannels,
             framesInChunk,
@@ -180,19 +187,17 @@ export const useTeacherAssistant = () => {
           const wavBuffer = encodeWavPCM16(chunkBuffer);
           chunksToProcess.push(new Blob([wavBuffer], { type: "audio/wav" }));
         }
-
-        // The reliable, sequential processing loop
         let fullTranscript = "";
         for (const [index, chunk] of chunksToProcess.entries()) {
           setStatusMessage(
             `Step 3/3: Transcribing chunk ${index + 1} of ${totalChunks}...`
           );
-          const transcriptPart = await transcribeAudioChunk(chunk); // Await each chunk
+          const transcriptPart = await transcribeAudioChunk(chunk);
           fullTranscript += ` ${transcriptPart}`;
           setTranscription(fullTranscript.trim());
         }
-
-        setStatusMessage("Transcription complete. Ready for analysis.");
+        // --- NEW: Trigger auto-analysis here ---
+        await runInitialAnalysis(fullTranscript.trim());
       } catch (error) {
         console.error("Audio processing failed:", error);
         setStatusMessage(`Error during processing: ${error.message}`);
@@ -200,22 +205,29 @@ export const useTeacherAssistant = () => {
         setIsProcessing(false);
       }
     },
-    [transcribeAudioChunk]
+    [transcribeAudioChunk, runInitialAnalysis]
   );
+
+  const resetStateForNewJob = () => {
+    setTranscription("");
+    setSummary("");
+    setKeyPoints("");
+    setCondensedLesson("");
+    setHomework("");
+    setQuiz("");
+    setLessonCreatorPrompt("");
+  };
 
   const startRecording = useCallback(async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       resetStateForNewJob();
       audioChunksRef.current = [];
-
       const recorder = new MediaRecorder(stream);
       mediaRecorderRef.current = recorder;
-
       recorder.ondataavailable = (e) => {
         if (e.data.size > 0) audioChunksRef.current.push(e.data);
       };
-
       recorder.onstop = () => {
         stream.getTracks().forEach((track) => track.stop());
         const recordedBlob = new Blob(audioChunksRef.current, {
@@ -223,7 +235,6 @@ export const useTeacherAssistant = () => {
         });
         processAudio(recordedBlob);
       };
-
       recorder.start();
       setIsRecording(true);
       setStatusMessage('Recording... Click "End Lesson" to process.');
@@ -240,7 +251,6 @@ export const useTeacherAssistant = () => {
     ) {
       mediaRecorderRef.current.stop();
       setIsRecording(false);
-      // The onstop handler will trigger the rest of the process.
     }
   }, []);
 
@@ -251,35 +261,12 @@ export const useTeacherAssistant = () => {
     [processAudio]
   );
 
-  // --- ANALYSIS AND SAVE FUNCTIONS (Unchanged, now they will work) ---
   const analyzeText = async (type) => {
     if (!transcription || isProcessing) return;
     setIsProcessing(true);
     try {
+      // This function now only handles the manual actions
       switch (type) {
-        case "summary":
-          setStatusMessage("Generating summary...");
-          const summaryResult = await executeSummarize(transcription, {
-            type: "tldr",
-            length: "long",
-          });
-          setSummary(summaryResult);
-          break;
-        case "keyPoints":
-          setStatusMessage("Generating key points...");
-          const pointsResult = await executeSummarize(transcription, {
-            type: "key-points",
-            length: "long",
-          });
-          setKeyPoints(pointsResult);
-          break;
-        case "condense":
-          setStatusMessage("Condensing lesson...");
-          const condensedResult = await executeRewrite(transcription, {
-            length: "shorter",
-          });
-          setCondensedLesson(condensedResult);
-          break;
         case "homework":
           setStatusMessage("Creating homework...");
           const hwPrompt = `Based on this lesson transcript, create 5 homework questions with clear answers provided separately:\n\n${transcription}`;
@@ -294,7 +281,7 @@ export const useTeacherAssistant = () => {
           break;
         case "lessonPrompt":
           setStatusMessage("Generating lesson creator prompt...");
-          const lpPrompt = `Based on the following lesson transcript, create a detailed prompt for a lesson creator AI. The prompt should capture the core topic, key concepts, and suggest an engaging format (like a story or comic) and a target age group. The goal is to create a new, refined lesson based on this live one.\n\nTranscript:\n${transcription}`;
+          const lpPrompt = `Based on the following lesson transcript, create a detailed prompt for a lesson creator AI...`;
           const lpResult = await executeWrite(lpPrompt);
           setLessonCreatorPrompt(lpResult);
           break;
@@ -302,7 +289,7 @@ export const useTeacherAssistant = () => {
           setStatusMessage("Unknown analysis type.");
           break;
       }
-      setStatusMessage("Analysis complete.");
+      setStatusMessage("Follow-up material generated.");
     } catch (error) {
       setStatusMessage(`Error during analysis: ${error.message}`);
     } finally {
@@ -310,11 +297,13 @@ export const useTeacherAssistant = () => {
     }
   };
 
-  const saveLesson = async () => {
-    if (!transcription) return;
-    setStatusMessage("Saving lesson...");
+  // --- FIX: Corrected and robust save function ---
+  const saveLesson = useCallback(async () => {
+    if (!transcription || isProcessing) return;
+    setIsProcessing(true);
+    setStatusMessage("Saving lesson to database...");
     try {
-      await db.teacherAssistantLessons.add({
+      const id = await db.teacherAssistantLessons.add({
         createdAt: new Date(),
         title: lessonTitle,
         transcription,
@@ -325,11 +314,24 @@ export const useTeacherAssistant = () => {
         quiz,
         lessonCreatorPrompt,
       });
-      setStatusMessage("Lesson saved successfully!");
+      setStatusMessage(`Lesson saved successfully! (ID: ${id})`);
     } catch (error) {
       setStatusMessage(`Failed to save lesson: ${error.message}`);
+      console.error("Save error:", error);
+    } finally {
+      setIsProcessing(false);
     }
-  };
+  }, [
+    isProcessing,
+    lessonTitle,
+    transcription,
+    summary,
+    keyPoints,
+    condensedLesson,
+    homework,
+    quiz,
+    lessonCreatorPrompt,
+  ]);
 
   return {
     isRecording,

@@ -105,3 +105,38 @@
   font-weight: bold;
   background-color: #0c64e4;
 }
+.card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid #ccc;
+  padding-bottom: 8px;
+  margin-bottom: 12px;
+}
+
+.card-header h4 {
+  margin: 0;
+  padding: 0;
+  border: none;
+}
+
+.copy-btn {
+  background: #e9ecef;
+  color: #495057;
+  border: 1px solid #ced4da;
+  padding: 4px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.8em;
+}
+
+.copy-btn:hover {
+  background: #dee2e6;
+}
+
+.copy-btn svg {
+  stroke: #495057;
+}

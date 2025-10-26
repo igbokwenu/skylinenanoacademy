@@ -4,6 +4,7 @@ import React from "react";
 import { useTeacherAssistant } from "../hooks/useTeacherAssistant";
 import AudioController from "../components/AudioController";
 import LessonAnalysisPanel from "../components/LessonAnalysisPanel";
+import DebugPanel from "../components/DebugPanel"; // <-- Import
 import "./TeacherAssistantPage.css";
 
 const TeacherAssistantPage = () => {
@@ -19,6 +20,9 @@ const TeacherAssistantPage = () => {
         </p>
       </div>
 
+      {/* Add the DebugPanel here */}
+      <DebugPanel />
+
       <div className="ta-main">
         <AudioController
           isRecording={teacherAssistantHook.isRecording}
@@ -27,7 +31,6 @@ const TeacherAssistantPage = () => {
           stopRecording={teacherAssistantHook.stopRecording}
           handleFileUpload={teacherAssistantHook.handleFileUpload}
         />
-
         <LessonAnalysisPanel hook={teacherAssistantHook} />
       </div>
     </div>

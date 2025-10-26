@@ -1,8 +1,15 @@
 // src/components/LessonAnalysisPanel.jsx
 
-import React from "react";
+import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import "./LessonAnalysisPanel.css";
+
+// --- NEW: Sanitize function to clean AI output ---
+const sanitizeContent = (content) => {
+  if (!content) return "";
+  // Removes leading/trailing whitespace and all asterisks/hash marks
+  return content.trim().replace(/[*#]/g, "");
+};
 
 const LessonAnalysisPanel = ({ hook }) => {
   const navigate = useNavigate();
@@ -22,20 +29,19 @@ const LessonAnalysisPanel = ({ hook }) => {
     saveLesson,
   } = hook;
 
-  // Function to create a shareable Google Form link (pre-filled)
   const createGoogleFormLink = (title, content) => {
     const formUrl =
       "https://docs.google.com/forms/d/e/1FAIpQLSc_1VzE_h_2iP84d_4v-C_l_p8Fvzv_J_b_v_J_c/viewform?usp=pp_url";
     const titleParam = `&entry.1045781291=${encodeURIComponent(title)}`;
-    const contentParam = `&entry.1065046570=${encodeURIComponent(content)}`;
+    const contentParam = `&entry.1065046570=${encodeURIComponent(
+      sanitizeContent(content)
+    )}`;
     window.open(formUrl + titleParam + contentParam, "_blank");
   };
 
   const navigateToLessonCreator = () => {
-    // This is a conceptual navigation. You might need to use state management (like Context or Redux)
-    // to pass the prompt to the LessonCreatorPage if it doesn't accept URL params.
     navigate("/lesson-creator", {
-      state: { defaultPrompt: lessonCreatorPrompt },
+      state: { defaultPrompt: sanitizeContent(lessonCreatorPrompt) },
     });
   };
 
@@ -61,30 +67,10 @@ const LessonAnalysisPanel = ({ hook }) => {
 
           <div className="transcription-output">
             <h4>Full Transcription</h4>
-            <textarea value={transcription} readOnly rows={15}></textarea>
+            <textarea value={transcription} readOnly rows={10}></textarea>
           </div>
 
-          <div className="analysis-actions">
-            <button
-              onClick={() => analyzeText("summary")}
-              disabled={isProcessing}
-            >
-              Generate Summary
-            </button>
-            <button
-              onClick={() => analyzeText("keyPoints")}
-              disabled={isProcessing}
-            >
-              Extract Key Points
-            </button>
-            <button
-              onClick={() => analyzeText("condense")}
-              disabled={isProcessing}
-            >
-              Condense Lesson
-            </button>
-          </div>
-
+          {/* This section now displays auto-generated content */}
           <div className="results-grid">
             {summary && <ResultCard title="Summary" content={summary} />}
             {keyPoints && <ResultCard title="Key Points" content={keyPoints} />}
@@ -151,7 +137,7 @@ const LessonAnalysisPanel = ({ hook }) => {
               onClick={saveLesson}
               disabled={isProcessing}
             >
-              Save Full Lesson
+              {isProcessing ? "Processing..." : "Save Full Lesson"}
             </button>
           </div>
         </>
@@ -160,21 +146,53 @@ const LessonAnalysisPanel = ({ hook }) => {
   );
 };
 
-const ResultCard = ({ title, content, onShare, onAction, actionText }) => (
-  <div className="result-card">
-    <h4>{title}</h4>
-    <pre className="result-content">{content}</pre>
-    {onShare && (
-      <button className="share-btn" onClick={onShare}>
-        Share via Google Form
-      </button>
-    )}
-    {onAction && (
-      <button className="action-btn" onClick={onAction}>
-        {actionText}
-      </button>
-    )}
-  </div>
-);
+// --- NEW: ResultCard with Copy Icon and Sanitization ---
+const ResultCard = ({ title, content, onShare, onAction, actionText }) => {
+  const [copyText, setCopyText] = useState("Copy");
+  const cleanedContent = sanitizeContent(content);
+
+  const handleCopy = () => {
+    navigator.clipboard.writeText(cleanedContent).then(() => {
+      setCopyText("Copied!");
+      setTimeout(() => setCopyText("Copy"), 2000); // Reset after 2 seconds
+    });
+  };
+
+  return (
+    <div className="result-card">
+      <div className="card-header">
+        <h4>{title}</h4>
+        <button onClick={handleCopy} className="copy-btn" title="Copy content">
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+          </svg>
+          <span>{copyText}</span>
+        </button>
+      </div>
+      <pre className="result-content">{cleanedContent}</pre>
+      {onShare && (
+        <button className="share-btn" onClick={onShare}>
+          Share via Google Form
+        </button>
+      )}
+      {onAction && (
+        <button className="action-btn" onClick={onAction}>
+          {actionText}
+        </button>
+      )}
+    </div>
+  );
+};
 
 export default LessonAnalysisPanel;
