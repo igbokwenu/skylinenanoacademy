@@ -140,3 +140,14 @@
 .copy-btn svg {
   stroke: #495057;
 }
+.card-actions {
+  margin-top: 15px;
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.share-btn.email {
+  background-color: #ffc107; /* A distinct color for email */
+  color: #212529;
+}

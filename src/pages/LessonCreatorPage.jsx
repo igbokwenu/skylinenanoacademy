@@ -1,6 +1,7 @@
 // src/pages/LessonCreatorPage.jsx
 
-import React, { useState, useMemo } from "react";
+import React, { useState, useEffect } from "react"; // <-- Import useEffect
+import { useLocation } from "react-router-dom";
 import { useLessonGenerator } from "../hooks/useLessonGenerator";
 import LessonPreview from "../components/LessonPreview";
 import LessonSettingsPanel from "../components/LessonSettingsPanel";
@@ -21,6 +22,7 @@ const initialCreatorSettings = {
 
 const LessonCreatorPage = () => {
   const [isPreviewVisible, setIsPreviewVisible] = useState(false);
+  const location = useLocation();
 
   // --- SHARED LESSON GENERATION LOGIC (From the Hook) ---
   const { handleGenerateImages: generateImagesInHook, ...restOfHook } =
@@ -60,6 +62,18 @@ const LessonCreatorPage = () => {
     handleSettingChange,
     abortCurrentPrompt,
   } = restOfHook;
+
+  useEffect(() => {
+    if (location.state) {
+      setSettings((prevSettings) => ({
+        ...prevSettings,
+        // Use the prompt if it exists, otherwise keep the old one
+        prompt: location.state.defaultPrompt || prevSettings.prompt,
+        // Use the ageGroup if it exists, otherwise keep the old one
+        ageGroup: location.state.ageGroup || prevSettings.ageGroup,
+      }));
+    }
+  }, [location.state, setSettings]);
 
   const runImageGenerationAndShowPreview = async () => {
     const success = await generateImagesInHook(); // Call the hook's function

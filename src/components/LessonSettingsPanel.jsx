@@ -11,6 +11,9 @@ const lessonParams = {
     "Grades 3-5 (Ages 8-10)",
     "Grades 6-8 (Ages 11-13)",
     "Grades 9-12 (Ages 14-18)",
+    "Undergraduate (Ages 18-22)",
+    "Graduate (Ages 23-26)",
+    "Postgraduate/Doctoral (Ages 27+)",
   ],
   perspectives: [
     "Third Person",

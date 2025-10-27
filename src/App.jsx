@@ -7,8 +7,8 @@ import HomePage from "./pages/HomePage";
 import LessonCreatorPage from "./pages/LessonCreatorPage";
 import ReteachModePage from "./pages/ReteachModePage";
 import BrowseLessonsPage from "./pages/BrowseLessonsPage";
-// Import the new page
 import TeacherAssistantPage from "./pages/TeacherAssistantPage";
+import SavedTAPage from "./pages/SavedTAPage";
 import { useMonitorDownload } from "./hooks/useMonitorDownload";
 
 function App() {
@@ -47,8 +47,8 @@ function App() {
         <Routes>
           <Route path="/" element={<HomePage />} />
           <Route path="/lesson-creator" element={<LessonCreatorPage />} />
-          {/* Add the new Route */}
           <Route path="/teacher-assistant" element={<TeacherAssistantPage />} />
+          <Route path="/teacher-assistant/saved" element={<SavedTAPage />} />
           <Route path="/reteach-mode" element={<ReteachModePage />} />
           <Route path="/browse-lessons" element={<BrowseLessonsPage />} />
         </Routes>

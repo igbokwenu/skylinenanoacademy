@@ -5,10 +5,13 @@ import { useMonitorDownload } from "./useMonitorDownload";
 import { imageModel, fileToGenerativePart } from "../lib/firebase";
 
 const ageGroupToPromptMap = {
-  "Grades 1-2 (Ages 6-7)": "a 6-7 year old child",
-  "Grades 3-5 (Ages 8-10)": "an 8-10 year old child",
-  "Grades 6-8 (Ages 11-13)": "an 11-13 year old adolescent",
-  "Grades 9-12 (Ages 14-18)": "a 14-18 year old teenager",
+"Grades 1-2 (Ages 6-7)": "a 6-7 year old child",
+"Grades 3-5 (Ages 8-10)": "an 8-10 year old child",
+"Grades 6-8 (Ages 11-13)": "an 11-13 year old adolescent",
+"Grades 9-12 (Ages 14-18)": "a 14-18 year old teenager",
+"Undergraduate (Ages 18-22)": "an 18-22 year old undergraduate student",
+"Graduate (Ages 23-26)": "a 23-26 year old graduate student",
+"Postgraduate/Doctoral (Ages 27+)": "a 27+ year old postgraduate or doctoral researcher",
 };
 
 const cleanAndParseJson = (rawString) => {

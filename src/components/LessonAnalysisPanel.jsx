@@ -4,10 +4,8 @@ import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import "./LessonAnalysisPanel.css";
 
-// --- NEW: Sanitize function to clean AI output ---
 const sanitizeContent = (content) => {
   if (!content) return "";
-  // Removes leading/trailing whitespace and all asterisks/hash marks
   return content.trim().replace(/[*#]/g, "");
 };
 
@@ -27,22 +25,40 @@ const LessonAnalysisPanel = ({ hook }) => {
     lessonCreatorPrompt,
     analyzeText,
     saveLesson,
+    savedLessonId,
   } = hook;
 
-  const createGoogleFormLink = (title, content) => {
-    const formUrl =
-      "https://docs.google.com/forms/d/e/1FAIpQLSc_1VzE_h_2iP84d_4v-C_l_p8Fvzv_J_b_v_J_c/viewform?usp=pp_url";
-    const titleParam = `&entry.1045781291=${encodeURIComponent(title)}`;
-    const contentParam = `&entry.1065046570=${encodeURIComponent(
-      sanitizeContent(content)
-    )}`;
-    window.open(formUrl + titleParam + contentParam, "_blank");
+  const createGoogleFormLink = () => {
+    alert("Full Google Form integration is coming soon!");
   };
 
-  const navigateToLessonCreator = () => {
+  // --- NEW: Function to handle auto-saving and navigation ---
+  const handleUseInLessonCreator = async () => {
+    const prompt = sanitizeContent(lessonCreatorPrompt);
+    navigator.clipboard.writeText(prompt); // Copy to clipboard for good UX
+
+    if (!savedLessonId) {
+      await saveLesson(); // Auto-save if not already saved
+    }
+    // NEW: Add the ageRange from the hook to the navigation state
     navigate("/lesson-creator", {
-      state: { defaultPrompt: sanitizeContent(lessonCreatorPrompt) },
+      state: {
+        defaultPrompt: prompt,
+        ageGroup: hook.ageRange, // Use the 'ageGroup' key to match LessonCreator's settings
+      },
     });
+  };
+
+  // --- NEW: Function to create and launch email client ---
+  const handleShareEmail = (materialType, content) => {
+    const subject = encodeURIComponent(`${lessonTitle}: ${materialType}`);
+    // Use %0D%0A for new lines in mailto links
+    const body = encodeURIComponent(
+      `Hello class,\n\nPlease find your ${materialType.toLowerCase()} below:\n\n---\n\n${sanitizeContent(
+        content
+      )}\n\n---\n\nBest,\nYour Teacher`
+    );
+    window.location.href = `mailto:?subject=${subject}&body=${body}`;
   };
 
   return (
@@ -64,13 +80,10 @@ const LessonAnalysisPanel = ({ hook }) => {
               disabled={isProcessing}
             />
           </div>
-
           <div className="transcription-output">
             <h4>Full Transcription</h4>
             <textarea value={transcription} readOnly rows={10}></textarea>
           </div>
-
-          {/* This section now displays auto-generated content */}
           <div className="results-grid">
             {summary && <ResultCard title="Summary" content={summary} />}
             {keyPoints && <ResultCard title="Key Points" content={keyPoints} />}
@@ -78,7 +91,6 @@ const LessonAnalysisPanel = ({ hook }) => {
               <ResultCard title="Condensed Version" content={condensedLesson} />
             )}
           </div>
-
           <div className="content-generation">
             <h4>3. Create Follow-Up Materials</h4>
             <div className="analysis-actions">
@@ -105,39 +117,42 @@ const LessonAnalysisPanel = ({ hook }) => {
               {homework && (
                 <ResultCard
                   title="Homework"
-                  content={homework}
+                  onShareEmail={() => handleShareEmail("Homework", homework)}
                   onShare={() =>
                     createGoogleFormLink(`${lessonTitle} - Homework`, homework)
                   }
+                  content={homework}
                 />
               )}
               {quiz && (
                 <ResultCard
                   title="Quiz"
-                  content={quiz}
+                  onShareEmail={() => handleShareEmail("Quiz", quiz)}
                   onShare={() =>
                     createGoogleFormLink(`${lessonTitle} - Quiz`, quiz)
                   }
+                  content={quiz}
                 />
               )}
               {lessonCreatorPrompt && (
                 <ResultCard
                   title="Lesson Creator Prompt"
+                  onAction={handleUseInLessonCreator}
+                  actionText="Use in Lesson Creator & Save"
                   content={lessonCreatorPrompt}
-                  onAction={navigateToLessonCreator}
-                  actionText="Use in Lesson Creator"
                 />
               )}
             </div>
           </div>
-
           <div className="save-action">
             <button
               className="save-btn"
               onClick={saveLesson}
               disabled={isProcessing}
             >
-              {isProcessing ? "Processing..." : "Save Full Lesson"}
+              {savedLessonId
+                ? `Update Saved Lesson (ID: ${savedLessonId})`
+                : "Save Full Lesson"}
             </button>
           </div>
         </>
@@ -146,8 +161,15 @@ const LessonAnalysisPanel = ({ hook }) => {
   );
 };
 
-// --- NEW: ResultCard with Copy Icon and Sanitization ---
-const ResultCard = ({ title, content, onShare, onAction, actionText }) => {
+const ResultCard = ({
+  title,
+  content,
+  onShare,
+  onAction,
+  actionText,
+  onShareEmail,
+}) => {
+  // ... same as before, but with onShareEmail prop ...
   const [copyText, setCopyText] = useState("Copy");
   const cleanedContent = sanitizeContent(content);
 
@@ -181,16 +203,23 @@ const ResultCard = ({ title, content, onShare, onAction, actionText }) => {
         </button>
       </div>
       <pre className="result-content">{cleanedContent}</pre>
-      {onShare && (
-        <button className="share-btn" onClick={onShare}>
-          Share via Google Form
-        </button>
-      )}
-      {onAction && (
-        <button className="action-btn" onClick={onAction}>
-          {actionText}
-        </button>
-      )}
+      <div className="card-actions">
+        {onShareEmail && (
+          <button className="share-btn email" onClick={onShareEmail}>
+            Share via Email
+          </button>
+        )}
+        {onShare && (
+          <button className="share-btn" onClick={onShare}>
+            Share via Google Form
+          </button>
+        )}
+        {onAction && (
+          <button className="action-btn" onClick={onAction}>
+            {actionText}
+          </button>
+        )}
+      </div>
     </div>
   );
 };

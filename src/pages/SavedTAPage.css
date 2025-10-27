@@ -1,0 +1,73 @@
+/* src/pages/SavedTAPage.css */
+
+.saved-ta-page .lc-header {
+  text-align: center;
+  margin-bottom: 30px;
+}
+
+.saved-ta-page .back-btn {
+  margin-top: 15px;
+  background: #6c757d;
+}
+
+.sessions-list {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+.session-item {
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+}
+
+.session-item summary {
+  padding: 15px;
+  cursor: pointer;
+  background-color: #f8f9fa;
+  font-size: 1.1em;
+}
+
+.summary-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.delete-session-btn {
+  background-color: #dc3545;
+  color: white;
+  border: none;
+  padding: 6px 12px;
+  border-radius: 5px;
+  font-size: 0.9em;
+}
+
+.session-content {
+  padding: 20px;
+  border-top: 1px solid #e0e0e0;
+}
+
+.content-section {
+  margin-bottom: 20px;
+}
+
+.content-section h4 {
+  margin-top: 0;
+  border-bottom: 1px solid #eee;
+  padding-bottom: 5px;
+}
+
+.content-section pre {
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  background-color: #f8f9fa;
+  padding: 10px;
+  border-radius: 4px;
+}
+
+.no-lessons-message {
+  text-align: center;
+  font-size: 1.2em;
+  color: #666;
+}

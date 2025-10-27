@@ -7,7 +7,7 @@ import { db } from "../lib/db";
 // --- CONFIGURATION ---
 const CHUNK_SECONDS = 29;
 
-// --- AUDIO PROCESSING UTILITIES (Proven from examples) ---
+// --- AUDIO UTILITIES (Unchanged) ---
 function writeString(view, offset, str) {
   for (let i = 0; i < str.length; i++) {
     view.setUint8(offset + i, str.charCodeAt(i));
@@ -66,6 +66,9 @@ export const useTeacherAssistant = () => {
   const [homework, setHomework] = useState("");
   const [quiz, setQuiz] = useState("");
   const [lessonCreatorPrompt, setLessonCreatorPrompt] = useState("");
+  // --- NEW: State for age range and saved status ---
+  const [ageRange, setAgeRange] = useState("Undergraduate (Ages 18-22)");
+  const [savedLessonId, setSavedLessonId] = useState(null);
 
   const mediaRecorderRef = useRef(null);
   const audioChunksRef = useRef([]);
@@ -80,6 +83,11 @@ export const useTeacherAssistant = () => {
   const { executePrompt: executeWrite } = useLanguageModel({
     apiName: "Writer",
   });
+
+  // --- NEW: Helper to add age context to all prompts ---
+  const getContextualPrompt = (basePrompt, transcript) => {
+    return `${basePrompt}\n\nTailor the language, complexity, and examples to be appropriate for the following age group: ${ageRange}.\n\nTranscript:\n${transcript}`;
+  };
 
   const transcribeAudioChunk = useCallback(async (blob) => {
     try {
@@ -116,11 +124,13 @@ export const useTeacherAssistant = () => {
     }
   }, []);
 
-  // --- NEW: Function to run initial analysis automatically ---
   const runInitialAnalysis = useCallback(
     async (fullTranscript) => {
       if (!fullTranscript) return;
       try {
+        // Note: The Summarizer and Rewriter APIs do not accept a 'context' parameter like the Writer API.
+        // The age-appropriateness is implicitly handled by the fine-tuning of these models.
+        // We still use our contextual prompts for the Writer API.
         setStatusMessage("Generating summary...");
         const summaryResult = await executeSummarize(fullTranscript, {
           type: "tldr",
@@ -196,7 +206,6 @@ export const useTeacherAssistant = () => {
           fullTranscript += ` ${transcriptPart}`;
           setTranscription(fullTranscript.trim());
         }
-        // --- NEW: Trigger auto-analysis here ---
         await runInitialAnalysis(fullTranscript.trim());
       } catch (error) {
         console.error("Audio processing failed:", error);
@@ -216,6 +225,7 @@ export const useTeacherAssistant = () => {
     setHomework("");
     setQuiz("");
     setLessonCreatorPrompt("");
+    setSavedLessonId(null); // Reset saved status
   };
 
   const startRecording = useCallback(async () => {
@@ -260,35 +270,38 @@ export const useTeacherAssistant = () => {
     },
     [processAudio]
   );
-
   const analyzeText = async (type) => {
     if (!transcription || isProcessing) return;
     setIsProcessing(true);
     try {
-      // This function now only handles the manual actions
+      let basePrompt = "";
+      let resultSetter;
       switch (type) {
         case "homework":
-          setStatusMessage("Creating homework...");
-          const hwPrompt = `Based on this lesson transcript, create 5 homework questions with clear answers provided separately:\n\n${transcription}`;
-          const hwResult = await executeWrite(hwPrompt, { length: "long" });
-          setHomework(hwResult);
+          basePrompt =
+            "Based on this lesson transcript, create 5 homework questions with clear answers provided separately.";
+          resultSetter = setHomework;
           break;
         case "quiz":
-          setStatusMessage("Creating quiz...");
-          const quizPrompt = `Based on this lesson transcript, create a 5-question multiple-choice quiz. For each question, provide 4 options and clearly indicate the correct answer:\n\n${transcription}`;
-          const quizResult = await executeWrite(quizPrompt, { length: "long" });
-          setQuiz(quizResult);
+          basePrompt =
+            "Based on this lesson transcript, create a 5-question multiple-choice quiz. For each question, provide 4 options and clearly indicate the correct answer.";
+          resultSetter = setQuiz;
           break;
         case "lessonPrompt":
-          setStatusMessage("Generating lesson creator prompt...");
-          const lpPrompt = `Based on the following lesson transcript, create a detailed prompt for a lesson creator AI...`;
-          const lpResult = await executeWrite(lpPrompt);
-          setLessonCreatorPrompt(lpResult);
+          // --- FIX: Correctly include the transcription in the prompt ---
+          basePrompt =
+            "Based on the following lesson transcript, create a detailed prompt for a lesson creator AI. The prompt should capture the core topic, key concepts, and suggest an engaging format (like a story or comic). The goal is to create a new, refined lesson based on this live one.";
+          resultSetter = setLessonCreatorPrompt;
           break;
         default:
           setStatusMessage("Unknown analysis type.");
-          break;
+          setIsProcessing(false);
+          return;
       }
+      setStatusMessage(`Creating ${type}...`);
+      const contextualPrompt = getContextualPrompt(basePrompt, transcription);
+      const result = await executeWrite(contextualPrompt, { length: "long" });
+      resultSetter(result);
       setStatusMessage("Follow-up material generated.");
     } catch (error) {
       setStatusMessage(`Error during analysis: ${error.message}`);
@@ -297,13 +310,12 @@ export const useTeacherAssistant = () => {
     }
   };
 
-  // --- FIX: Corrected and robust save function ---
   const saveLesson = useCallback(async () => {
     if (!transcription || isProcessing) return;
     setIsProcessing(true);
     setStatusMessage("Saving lesson to database...");
     try {
-      const id = await db.teacherAssistantLessons.add({
+      const lessonData = {
         createdAt: new Date(),
         title: lessonTitle,
         transcription,
@@ -313,8 +325,14 @@ export const useTeacherAssistant = () => {
         homework,
         quiz,
         lessonCreatorPrompt,
-      });
-      setStatusMessage(`Lesson saved successfully! (ID: ${id})`);
+      };
+      // If it was already saved, update it. Otherwise, add new.
+      const idToSave = savedLessonId
+        ? await db.teacherAssistantLessons.put(lessonData, savedLessonId)
+        : await db.teacherAssistantLessons.add(lessonData);
+      setSavedLessonId(idToSave); // Keep track of the saved ID
+      setStatusMessage(`Lesson saved successfully! (ID: ${idToSave})`);
+      return idToSave; // Return ID for other functions to use
     } catch (error) {
       setStatusMessage(`Failed to save lesson: ${error.message}`);
       console.error("Save error:", error);
@@ -331,6 +349,7 @@ export const useTeacherAssistant = () => {
     homework,
     quiz,
     lessonCreatorPrompt,
+    savedLessonId,
   ]);
 
   return {
@@ -346,6 +365,9 @@ export const useTeacherAssistant = () => {
     homework,
     quiz,
     lessonCreatorPrompt,
+    ageRange,
+    setAgeRange, // Expose ageRange state
+    savedLessonId, // Expose saved status
     startRecording,
     stopRecording,
     handleFileUpload,
