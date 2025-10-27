@@ -1,15 +1,17 @@
+/* src/pages/HomePage.css */
+
 .home-container {
-  max-width: 960px;
+  max-width: 1000px;
   margin: 0 auto;
   padding: 40px 20px;
   text-align: center;
-  animation: fadeIn 1s ease-in-out;
+  animation: fadeIn 0.8s ease-in-out;
 }
 
 @keyframes fadeIn {
   from {
     opacity: 0;
-    transform: translateY(20px);
+    transform: translateY(15px);
   }
   to {
     opacity: 1;
@@ -18,80 +20,112 @@
 }
 
 .hero-section {
-  margin-bottom: 60px;
+  margin-bottom: 80px;
 }
 
 .hero-title {
-  font-size: 2.8rem;
-  font-weight: 700;
-  margin-bottom: 15px;
-  color: #222;
+  font-size: 3.2rem;
+  font-weight: 800;
+  margin-bottom: 1rem;
+  color: #1a202c;
+  letter-spacing: -1.5px;
 }
 
 .hero-subtitle {
-  font-size: 1.4rem;
-  color: #0c64e4; /* Primary color */
-  margin-bottom: 20px;
+  font-size: 1.5rem;
+  color: #0c64e4;
+  margin-bottom: 1.5rem;
   font-weight: 500;
 }
 
 .hero-description {
-  font-size: 1.1rem;
-  color: #555;
-  line-height: 1.6;
+  font-size: 1.15rem;
+  color: #4a5568;
+  line-height: 1.7;
+  max-width: 700px;
+  margin: 0 auto;
 }
 
 .section-title {
-  font-size: 2rem;
-  font-weight: 600;
-  margin-bottom: 40px;
-  border-bottom: 2px solid #e0e0e0;
-  padding-bottom: 10px;
+  font-size: 2.2rem;
+  font-weight: 700;
+  margin-bottom: 50px;
+  color: #2d3748;
+  position: relative;
   display: inline-block;
 }
 
+.section-title::after {
+  content: "";
+  position: absolute;
+  bottom: -10px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 60px;
+  height: 4px;
+  background-color: #0c64e4;
+  border-radius: 2px;
+}
+
 .features-section {
-  margin-bottom: 60px;
+  margin-bottom: 80px;
 }
 
 .features-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
   gap: 30px;
   text-align: left;
 }
 
 .feature-card {
   background-color: #ffffff;
-  padding: 30px;
-  border-radius: 12px;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+  padding: 35px;
+  border-radius: 16px;
+  border: 1px solid #e2e8f0;
   transition: transform 0.3s ease, box-shadow 0.3s ease;
 }
 
 .feature-card:hover {
-  transform: translateY(-8px);
-  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.12);
+  transform: translateY(-10px);
+  box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.1);
+}
+
+/* Style to highlight the new primary feature */
+.feature-card.primary-feature {
+  background: linear-gradient(145deg, #e9f2ff, #ffffff);
+  border-color: #c3dafe;
+}
+
+.feature-icon-wrapper {
+  width: 70px;
+  height: 70px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 20px;
+  background-color: #0c64e4;
 }
 
 .feature-icon {
-  color: #0c64e4;
-  margin-bottom: 15px;
+  color: #ffffff;
 }
 
 .feature-card h3 {
-  font-size: 1.3rem;
+  font-size: 1.4rem;
   margin-top: 0;
-  margin-bottom: 10px;
+  margin-bottom: 12px;
+  color: #1a202c;
 }
 
 .feature-card p {
-  color: #666;
+  color: #4a5568;
   line-height: 1.6;
 }
 
 .cta-section {
-  margin-top: 40px;
+  margin-top: 60px;
 }
 
 .cta-buttons {
@@ -102,15 +136,16 @@
 }
 
 .cta-button {
-  padding: 15px 30px;
+  padding: 16px 32px;
   font-size: 1.1rem;
   font-weight: 600;
   text-decoration: none;
-  border-radius: 8px;
+  border-radius: 50px; /* Pill shape */
   transition: all 0.3s ease;
   display: inline-flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
+  border: 2px solid transparent;
 }
 
 .cta-button.primary {
@@ -119,26 +154,27 @@
 }
 .cta-button.primary:hover {
   background-color: #0a58d1;
-  transform: translateY(-2px);
-  box-shadow: 0 4px 15px rgba(12, 100, 228, 0.3);
+  transform: translateY(-3px);
+  box-shadow: 0 7px 20px rgba(12, 100, 228, 0.25);
 }
 
 .cta-button.secondary {
-  background-color: #28a745;
-  color: white;
+  background-color: transparent;
+  color: #2d3748;
+  border-color: #e2e8f0;
 }
 .cta-button.secondary:hover {
-  background-color: #218838;
-  transform: translateY(-2px);
-  box-shadow: 0 4px 15px rgba(40, 167, 69, 0.3);
+  background-color: #f7fafc;
+  border-color: #cbd5e0;
+  transform: translateY(-3px);
 }
 
 .cta-button.tertiary {
-  background-color: #f8f9fa;
-  color: #333;
-  border: 1px solid #ddd;
+  background-color: transparent;
+  color: #4a5568;
+  font-weight: 500;
+  padding: 14px 28px;
 }
 .cta-button.tertiary:hover {
-  background-color: #e9ecef;
-  border-color: #ccc;
+  color: #0c64e4;
 }

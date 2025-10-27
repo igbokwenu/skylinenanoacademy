@@ -128,9 +128,17 @@ export const useTeacherAssistant = () => {
     async (fullTranscript) => {
       if (!fullTranscript) return;
       try {
-        // Note: The Summarizer and Rewriter APIs do not accept a 'context' parameter like the Writer API.
-        // The age-appropriateness is implicitly handled by the fine-tuning of these models.
-        // We still use our contextual prompts for the Writer API.
+        // --- NEW: Generate a title first ---
+        setStatusMessage("Generating lesson title...");
+        const titleResult = await executeSummarize(fullTranscript, {
+          type: "headline",
+          length: "short",
+        });
+        // Sanitize the title by removing quotes and periods, then update state.
+        if (titleResult) {
+          setLessonTitle(titleResult.replace(/["\.]/g, "").trim());
+        }
+
         setStatusMessage("Generating summary...");
         const summaryResult = await executeSummarize(fullTranscript, {
           type: "tldr",
@@ -161,7 +169,6 @@ export const useTeacherAssistant = () => {
     },
     [executeSummarize, executeRewrite]
   );
-
   const processAudio = useCallback(
     async (blob) => {
       resetStateForNewJob();
