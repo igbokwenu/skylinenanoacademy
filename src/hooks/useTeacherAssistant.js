@@ -128,17 +128,25 @@ export const useTeacherAssistant = () => {
     async (fullTranscript) => {
       if (!fullTranscript) return;
       try {
-        // --- NEW: Generate a title first ---
+        // --- NEW: Using the Writer API for a controlled, high-quality title ---
         setStatusMessage("Generating lesson title...");
-        const titleResult = await executeSummarize(fullTranscript, {
-          type: "headline",
-          length: "short",
-        });
-        // Sanitize the title by removing quotes and periods, then update state.
+        const titleBasePrompt =
+          "You are a creative editor. Based on the following lesson content, write one single, compelling, and concise title. The title must be a single sentence and should not exceed 15 words. Your response must ONLY contain the title text, with no asterisks, quotes, or bullet points.";
+
+        // We use getContextualPrompt here to ensure the title is also age-appropriate
+        const contextualTitlePrompt = getContextualPrompt(
+          titleBasePrompt,
+          fullTranscript
+        );
+        const titleResult = await executeWrite(contextualTitlePrompt);
+
+        // Sanitize the title robustly before setting the state
         if (titleResult) {
-          setLessonTitle(titleResult.replace(/["\.]/g, "").trim());
+          const cleanedTitle = titleResult.replace(/[*#"\.]/g, "").trim();
+          setLessonTitle(cleanedTitle);
         }
 
+        // --- The rest of the analysis continues as before ---
         setStatusMessage("Generating summary...");
         const summaryResult = await executeSummarize(fullTranscript, {
           type: "tldr",
@@ -167,7 +175,7 @@ export const useTeacherAssistant = () => {
         setStatusMessage(`Error during auto-analysis: ${error.message}`);
       }
     },
-    [executeSummarize, executeRewrite]
+    [executeSummarize, executeRewrite, executeWrite, getContextualPrompt] // Added executeWrite and getContextualPrompt to dependency array
   );
   const processAudio = useCallback(
     async (blob) => {
