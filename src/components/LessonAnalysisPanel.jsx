@@ -3,6 +3,7 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import "./LessonAnalysisPanel.css";
+import ShareModal from "./ShareModal";
 
 const sanitizeContent = (content) => {
   if (!content) return "";
@@ -11,6 +12,8 @@ const sanitizeContent = (content) => {
 
 const LessonAnalysisPanel = ({ hook }) => {
   const navigate = useNavigate();
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [modalConfig, setModalConfig] = useState({ onConfirm: () => {} });
   const {
     isProcessing,
     statusMessage,
@@ -51,16 +54,32 @@ const LessonAnalysisPanel = ({ hook }) => {
 
   // --- NEW: Function to create and launch email client ---
   const handleShareEmail = (materialType, content) => {
-    const subject = encodeURIComponent(`${lessonTitle}: ${materialType}`);
-    // Use %0D%0A for new lines in mailto links
-    const body = encodeURIComponent(
-      `Hello class,\n\nPlease find your ${materialType.toLowerCase()} below:\n\n---\n\n${sanitizeContent(
-        content
-      )}\n\n---\n\nBest,\nYour Teacher`
-    );
-    window.location.href = `mailto:?subject=${subject}&body=${body}`;
-  };
+    const fullEmailBody = `Hello class,\n\nPlease find your ${materialType.toLowerCase()} below:\n\n---\n\n${sanitizeContent(
+      content
+    )}\n\n---\n\nBest,\nYour Teacher`;
 
+    navigator.clipboard
+      .writeText(fullEmailBody)
+      .then(() => {
+        const subject = encodeURIComponent(`${lessonTitle}: ${materialType}`);
+        const mailtoLink = `mailto:?subject=${subject}`;
+
+        // Configure the modal with the new robust action and the fallback link
+        setModalConfig({
+          mailtoLink: mailtoLink, // Pass the link for the fallback <a> tag
+          onConfirm: () => {
+            // Use window.open as the primary, more reliable programmatic method
+            window.open(mailtoLink, "_self");
+            setIsModalOpen(false);
+          },
+        });
+        setIsModalOpen(true);
+      })
+      .catch((err) => {
+        console.error("Failed to copy to clipboard", err);
+        alert("Could not copy content to clipboard. Please copy it manually.");
+      });
+  };
   return (
     <div className="analysis-panel">
       <h3>2. Review & Generate</h3>
@@ -118,9 +137,7 @@ const LessonAnalysisPanel = ({ hook }) => {
                 <ResultCard
                   title="Homework"
                   onShareEmail={() => handleShareEmail("Homework", homework)}
-                  onShare={() =>
-                    createGoogleFormLink(`${lessonTitle} - Homework`, homework)
-                  }
+                  onShare={createGoogleFormLink}
                   content={homework}
                 />
               )}
@@ -128,9 +145,7 @@ const LessonAnalysisPanel = ({ hook }) => {
                 <ResultCard
                   title="Quiz"
                   onShareEmail={() => handleShareEmail("Quiz", quiz)}
-                  onShare={() =>
-                    createGoogleFormLink(`${lessonTitle} - Quiz`, quiz)
-                  }
+                  onShare={createGoogleFormLink}
                   content={quiz}
                 />
               )}
@@ -157,6 +172,15 @@ const LessonAnalysisPanel = ({ hook }) => {
           </div>
         </>
       )}
+      <ShareModal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        onConfirm={modalConfig.onConfirm}
+        mailtoLink={modalConfig.mailtoLink} // <-- ADD THIS PROP
+        title="Content Copied Successfully!"
+      >
+        {/* The children are now hardcoded inside the ShareModal component */}
+      </ShareModal>
     </div>
   );
 };

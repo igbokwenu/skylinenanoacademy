@@ -1,0 +1,79 @@
+/* src/components/ShareModal.css */
+
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.6);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 2000; /* Ensure it's on top */
+}
+
+.modal-content {
+  background-color: #ffffff;
+  padding: 25px;
+  border-radius: 12px;
+  box-shadow: 0 5px 20px rgba(0, 0, 0, 0.2);
+  width: 90%;
+  max-width: 500px;
+}
+
+.modal-content h3 {
+  margin-top: 0;
+  border-bottom: 1px solid #e0e0e0;
+  padding-bottom: 10px;
+}
+
+.modal-body {
+  margin: 20px 0;
+  line-height: 1.6;
+}
+
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 15px;
+}
+
+.modal-actions button {
+  padding: 10px 20px;
+  border-radius: 6px;
+  border: none;
+  font-size: 1em;
+  cursor: pointer;
+}
+
+.modal-btn-primary {
+  background-color: #0c64e4;
+  color: white;
+}
+
+.modal-btn-secondary {
+  background-color: #6c757d;
+  color: white;
+}
+
+.fallback-container {
+  margin-top: 20px;
+  padding: 15px;
+  background-color: #f8f9fa;
+  border: 1px solid #dee2e6;
+  border-radius: 8px;
+  text-align: center;
+}
+
+.fallback-container p {
+  margin: 0 0 10px 0;
+  font-size: 0.9em;
+  color: #495057;
+}
+
+.fallback-link {
+  font-weight: bold;
+  color: #0c64e4;
+  text-decoration: underline;
+}
