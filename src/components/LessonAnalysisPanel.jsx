@@ -51,25 +51,30 @@ const LessonAnalysisPanel = ({ hook }) => {
 
   // --- NEW: Function to create and launch email client ---
   const handleShareEmail = (materialType, content) => {
+    const sanitizedFullContent = sanitizeContent(content);
+    const separator = "---ANSWERS---";
+    let contentForStudent = sanitizedFullContent;
+
+    // Check if the separator exists and split the string to get only the questions
+    if (sanitizedFullContent.includes(separator)) {
+      contentForStudent = sanitizedFullContent.split(separator)[0].trim();
+    }
+
     const subject = encodeURIComponent(`${lessonTitle}: ${materialType}`);
     const body = encodeURIComponent(
-      `Hello class,\n\nPlease find your ${materialType.toLowerCase()} below:\n\n---\n\n${sanitizeContent(
-        content
-      )}\n\n---\n\nBest,\nYour Teacher`
+      `Hello class,\n\nPlease find your ${materialType.toLowerCase()} below:\n\n---\n\n${contentForStudent}\n\n---\n\nBest,\nYour Teacher`
     );
 
     const mailtoLink = `mailto:?subject=${subject}&body=${body}`;
 
-    // A simple check for extremely long content that might still fail in some clients.
     if (mailtoLink.length > 8000) {
       alert(
-        "This content is very long and may not fit in an email link. We have copied it to your clipboard for you to paste manually."
+        "This content is very long and may not fit in an email link. We have copied the questions to your clipboard for you to paste manually."
       );
-      navigator.clipboard.writeText(sanitizeContent(content));
+      navigator.clipboard.writeText(contentForStudent);
       return;
     }
 
-    // Use window.open to avoid replacing the current tab.
     window.open(mailtoLink, "_blank");
   };
   return (

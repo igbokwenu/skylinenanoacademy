@@ -276,15 +276,16 @@ export const useTeacherAssistant = () => {
     try {
       let basePrompt = "";
       let resultSetter;
+
       switch (type) {
         case "homework":
           basePrompt =
-            "You are a teacher creating a homework assignment for your students based on a lesson you just taught. The content of the lesson is provided below. Create 5 homework questions that challenge students to think critically about the material. Provide a separate answer key below the questions.";
+            "You are a teacher creating a homework assignment based on a lesson you just taught. The content of the lesson is provided below. Create 5 homework questions. After all the questions are listed, you MUST include a separator line that contains only the text '---ANSWERS---'. After the separator, provide a detailed answer key.";
           resultSetter = setHomework;
           break;
         case "quiz":
           basePrompt =
-            "You are a teacher creating a quiz for your students based on a lesson you just taught. The content of the lesson is provided below. Create a 5-question multiple-choice quiz. For each question, provide 4 options (A, B, C, D) and clearly indicate the correct answer.";
+            "You are a teacher creating a quiz based on a lesson you just taught. The content of the lesson is provided below. Create a 5-question multiple-choice quiz with 4 options each. After all the questions and their options are listed, you MUST include a separator line that contains only the text '---ANSWERS---'. After the separator, provide the answer key, clearly indicating the correct letter for each question.";
           resultSetter = setQuiz;
           break;
         case "lessonPrompt":
