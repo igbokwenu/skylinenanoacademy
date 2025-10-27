@@ -9,6 +9,7 @@ const AudioController = ({
   startRecording,
   stopRecording,
   handleFileUpload,
+  onMicCheck,
 }) => {
   const canvasRef = useRef(null);
   const animationFrameRef = useRef(null);
@@ -116,6 +117,9 @@ const AudioController = ({
   return (
     <div className="audio-controller">
       <h3>1. Start Lesson</h3>
+      <div className="mic-check-prompt">
+        <p>For best results, use a quality headset or microphone.</p>
+      </div>
       <div className="controls-group">
         <button
           className={buttonProps.className}
@@ -133,6 +137,13 @@ const AudioController = ({
           >
             Or Upload Audio File
           </label>
+          <button
+            onClick={onMicCheck}
+            disabled={isRecording || isProcessing}
+            className="mic-check-btn"
+          >
+            Quick Mic Check
+          </button>
           <input
             id="audio-upload"
             type="file"

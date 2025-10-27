@@ -99,3 +99,18 @@
   cursor: not-allowed;
   color: #e0e0e0;
 }
+.mic-check-btn {
+  background-color: #e65100; /* deep orange */
+  color: white;
+  border: none;
+  border-radius: 8px;
+  padding: 10px 20px;
+  margin: 0 12px; /* spacing on left and right */
+  cursor: pointer;
+  font-size: 16px;
+  transition: background-color 0.3s ease;
+}
+
+.mic-check-btn:hover {
+  background-color: #ff6d00; /* lighter orange on hover */
+}

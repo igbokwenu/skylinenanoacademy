@@ -1,11 +1,15 @@
 // src/hooks/useTeacherAssistant.js
-
 import { useState, useRef, useCallback, useEffect } from "react";
 import { useLanguageModel } from "./useLanguageModel";
 import { db } from "../lib/db";
+import { cloudTextModel } from "../lib/firebase"; // Import cloud model for reprocessing
+import { doc, updateDoc, increment } from "firebase/firestore"; // For updating call count
+import { auth } from "../lib/firebase"; // For getting current user
 
 // --- CONFIGURATION ---
 const CHUNK_SECONDS = 29;
+const LIVE_TRANSCRIPTION_INTERVAL_MS = 5000; // Transcribe every 5 seconds
+const LIVE_TRANSCRIPTION_DELAY_MS = 60000; // Start live transcription after 1 minute (60 seconds)
 
 // --- AUDIO UTILITIES (Unchanged) ---
 function writeString(view, offset, str) {
@@ -52,6 +56,11 @@ function encodeWavPCM16(audioBuffer) {
   return buf;
 }
 
+// --- TOKEN ESTIMATION ---
+const estimateTokens = (text) => Math.ceil(text.length / 4);
+const ON_DEVICE_TOKEN_LIMIT = 5800;
+const MAX_TRANSCRIPTION_DURATION_HOURS = 12;
+
 export const useTeacherAssistant = () => {
   const [isRecording, setIsRecording] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -66,13 +75,18 @@ export const useTeacherAssistant = () => {
   const [homework, setHomework] = useState("");
   const [quiz, setQuiz] = useState("");
   const [lessonCreatorPrompt, setLessonCreatorPrompt] = useState("");
-  // --- NEW: State for age range and saved status ---
   const [ageRange, setAgeRange] = useState("Undergraduate (Ages 18-22)");
   const [savedLessonId, setSavedLessonId] = useState(null);
+
+  // --- NEW STATE for Hybrid Processing ---
+  const [isPartiallyProcessed, setIsPartiallyProcessed] = useState(false);
+  const [fullTranscriptForReprocessing, setFullTranscriptForReprocessing] =
+    useState("");
 
   const mediaRecorderRef = useRef(null);
   const audioChunksRef = useRef([]);
   const languageModelSessionRef = useRef(null);
+  const liveTranscriptionTimerRef = useRef(null);
 
   const { executePrompt: executeSummarize } = useLanguageModel({
     apiName: "Summarizer",
@@ -84,7 +98,6 @@ export const useTeacherAssistant = () => {
     apiName: "Writer",
   });
 
-  // --- NEW: Helper to add age context to all prompts ---
   const getContextualPrompt = (basePrompt, transcript) => {
     return `${basePrompt}\n\nTailor the language, complexity, and examples to be appropriate for the following age group: ${ageRange}.\n\nTranscript:\n${transcript}`;
   };
@@ -99,7 +112,7 @@ export const useTeacherAssistant = () => {
         });
       }
       const arrayBuffer = await blob.arrayBuffer();
-      const stream = await languageModelSessionRef.current.promptStreaming([
+      const result = await languageModelSessionRef.current.prompt([
         {
           role: "user",
           content: [
@@ -108,14 +121,13 @@ export const useTeacherAssistant = () => {
           ],
         },
       ]);
-      let fullResponse = "";
-      for await (const chunk of stream) {
-        fullResponse += chunk;
-      }
-      return fullResponse;
+      return result;
     } catch (error) {
       console.error("Transcription chunk failed:", error);
-      setStatusMessage(`Error: ${error.message}`);
+      // Don't show error for empty chunks during live transcription
+      if (!error.message.includes("empty")) {
+        setStatusMessage(`Error: ${error.message}`);
+      }
       if (languageModelSessionRef.current) {
         languageModelSessionRef.current.destroy();
         languageModelSessionRef.current = null;
@@ -124,59 +136,101 @@ export const useTeacherAssistant = () => {
     }
   }, []);
 
+  // --- NEW: Microphone Test Transcription Function ---
+  const transcribeTestAudio = useCallback(
+    async (blob) => {
+      if (!blob || blob.size === 0) return "No audio recorded.";
+      return await transcribeAudioChunk(blob);
+    },
+    [transcribeAudioChunk]
+  );
+
   const runInitialAnalysis = useCallback(
     async (fullTranscript) => {
       if (!fullTranscript) return;
+      setIsPartiallyProcessed(false);
+      setFullTranscriptForReprocessing("");
+
+      let transcriptForProcessing = fullTranscript;
+      const totalTokens = estimateTokens(fullTranscript);
+
+      if (totalTokens > ON_DEVICE_TOKEN_LIMIT) {
+        setIsPartiallyProcessed(true);
+        setFullTranscriptForReprocessing(fullTranscript);
+        // Find a good place to slice without cutting a word
+        let sliceEnd = ON_DEVICE_TOKEN_LIMIT * 4;
+        while (
+          sliceEnd < fullTranscript.length &&
+          fullTranscript[sliceEnd] !== " "
+        ) {
+          sliceEnd++;
+        }
+        transcriptForProcessing = fullTranscript.substring(0, sliceEnd);
+        const processedPercentage = Math.round(
+          (transcriptForProcessing.length / fullTranscript.length) * 100
+        );
+        setStatusMessage(
+          `On-device processing limit reached. Processing first ${processedPercentage}% of the transcript.`
+        );
+      }
+
       try {
-        // --- NEW: Using the Writer API for a controlled, high-quality title ---
         setStatusMessage("Generating lesson title...");
         const titleBasePrompt =
           "You are a creative editor. Based on the following lesson content, write one single, compelling, and concise title. The title must be a single sentence and should not exceed 15 words. Your response must ONLY contain the title text, with no asterisks, quotes, or bullet points.";
-
-        // We use getContextualPrompt here to ensure the title is also age-appropriate
         const contextualTitlePrompt = getContextualPrompt(
           titleBasePrompt,
-          fullTranscript
+          transcriptForProcessing
         );
         const titleResult = await executeWrite(contextualTitlePrompt);
-
-        // Sanitize the title robustly before setting the state
         if (titleResult) {
           const cleanedTitle = titleResult.replace(/[*#"\.]/g, "").trim();
           setLessonTitle(cleanedTitle);
         }
 
-        // --- The rest of the analysis continues as before ---
         setStatusMessage("Generating summary...");
-        const summaryResult = await executeSummarize(fullTranscript, {
+        const summaryResult = await executeSummarize(transcriptForProcessing, {
           type: "tldr",
           length: "long",
         });
         setSummary(summaryResult);
 
         setStatusMessage("Extracting key points...");
-        const pointsResult = await executeSummarize(fullTranscript, {
+        const pointsResult = await executeSummarize(transcriptForProcessing, {
           type: "key-points",
           length: "long",
         });
         setKeyPoints(pointsResult);
 
         setStatusMessage("Condensing lesson...");
-        const condensedResult = await executeRewrite(fullTranscript, {
+        const condensedResult = await executeRewrite(transcriptForProcessing, {
           length: "shorter",
         });
         setCondensedLesson(condensedResult);
 
-        setStatusMessage(
-          "Initial analysis complete. You can now generate follow-up materials."
-        );
+        if (isPartiallyProcessed) {
+          setStatusMessage(
+            "Initial analysis complete on partial transcript. Use Cloud AI to process the full text."
+          );
+        } else {
+          setStatusMessage(
+            "Initial analysis complete. You can now generate follow-up materials."
+          );
+        }
       } catch (error) {
         console.error("Initial analysis failed:", error);
         setStatusMessage(`Error during auto-analysis: ${error.message}`);
       }
     },
-    [executeSummarize, executeRewrite, executeWrite, getContextualPrompt] // Added executeWrite and getContextualPrompt to dependency array
+    [
+      executeSummarize,
+      executeRewrite,
+      executeWrite,
+      getContextualPrompt,
+      isPartiallyProcessed,
+    ]
   );
+
   const processAudio = useCallback(
     async (blob) => {
       resetStateForNewJob();
@@ -187,6 +241,15 @@ export const useTeacherAssistant = () => {
         const ac = new (window.AudioContext || window.webkitAudioContext)();
         const audioBuffer = await ac.decodeAudioData(arrayBuffer);
         const { sampleRate, numberOfChannels, duration } = audioBuffer;
+
+        if (duration > MAX_TRANSCRIPTION_DURATION_HOURS * 3600) {
+          setStatusMessage(
+            `Audio exceeds the maximum limit of ${MAX_TRANSCRIPTION_DURATION_HOURS} hours.`
+          );
+          setIsProcessing(false);
+          return;
+        }
+
         const totalChunks = Math.max(1, Math.ceil(duration / CHUNK_SECONDS));
         setStatusMessage(`Step 2/3: Slicing into ${totalChunks} chunk(s)...`);
         const chunksToProcess = [];
@@ -240,34 +303,104 @@ export const useTeacherAssistant = () => {
     setHomework("");
     setQuiz("");
     setLessonCreatorPrompt("");
-    setSavedLessonId(null); // Reset saved status
+    setSavedLessonId(null);
+    setIsPartiallyProcessed(false);
+    setFullTranscriptForReprocessing("");
   };
+
+  const startLiveTranscription = useCallback(() => {
+    const transcribeCurrentChunks = async () => {
+      if (
+        mediaRecorderRef.current?.state !== "recording" ||
+        audioChunksRef.current.length === 0
+      )
+        return;
+
+      const liveBlob = new Blob(audioChunksRef.current, { type: "audio/webm" });
+      const transcriptPart = await transcribeAudioChunk(liveBlob);
+
+      // Clear chunks that have been transcribed
+      audioChunksRef.current = [];
+
+      if (transcriptPart !== "[TRANSCRIPTION ERROR]") {
+        setTranscription((prev) => `${prev} ${transcriptPart}`.trim());
+      }
+    };
+    // Clear any existing timer
+    if (liveTranscriptionTimerRef.current)
+      clearInterval(liveTranscriptionTimerRef.current);
+    // Set a new timer
+    liveTranscriptionTimerRef.current = setInterval(
+      transcribeCurrentChunks,
+      LIVE_TRANSCRIPTION_INTERVAL_MS
+    );
+  }, [transcribeAudioChunk]);
 
   const startRecording = useCallback(async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       resetStateForNewJob();
       audioChunksRef.current = [];
-      const recorder = new MediaRecorder(stream);
+      const recorder = new MediaRecorder(stream, { mimeType: "audio/webm" });
       mediaRecorderRef.current = recorder;
+
       recorder.ondataavailable = (e) => {
         if (e.data.size > 0) audioChunksRef.current.push(e.data);
       };
+
       recorder.onstop = () => {
         stream.getTracks().forEach((track) => track.stop());
-        const recordedBlob = new Blob(audioChunksRef.current, {
-          type: "audio/webm",
-        });
-        processAudio(recordedBlob);
+        if (liveTranscriptionTimerRef.current)
+          clearInterval(liveTranscriptionTimerRef.current);
+
+        const processFinalChunks = async () => {
+          if (audioChunksRef.current.length > 0) {
+            const finalBlob = new Blob(audioChunksRef.current, {
+              type: "audio/webm",
+            });
+            const finalTranscriptPart = await transcribeAudioChunk(finalBlob);
+            audioChunksRef.current = [];
+            const finalFullTranscript =
+              `${transcription} ${finalTranscriptPart}`.trim();
+            setTranscription(finalFullTranscript);
+            await runInitialAnalysis(finalFullTranscript);
+          } else {
+            await runInitialAnalysis(transcription);
+          }
+          setIsProcessing(false);
+        };
+
+        setIsProcessing(true);
+        setStatusMessage("Finalizing transcription...");
+        processFinalChunks();
       };
-      recorder.start();
+
+      recorder.start(LIVE_TRANSCRIPTION_INTERVAL_MS); // Slice audio at the same interval as transcription
       setIsRecording(true);
-      setStatusMessage('Recording... Click "End Lesson" to process.');
+      setStatusMessage(
+        `Recording... Live transcription will start in ${
+          LIVE_TRANSCRIPTION_DELAY_MS / 1000
+        } seconds.`
+      );
+
+      // Delay the start of live transcription
+      setTimeout(() => {
+        if (mediaRecorderRef.current?.state === "recording") {
+          setStatusMessage("Recording... Live transcription is active.");
+          startLiveTranscription();
+        }
+      }, LIVE_TRANSCRIPTION_DELAY_MS);
     } catch (err) {
       setStatusMessage("Microphone access denied. Please check permissions.");
       console.error(err);
     }
-  }, [processAudio]);
+  }, [
+    processAudio,
+    startLiveTranscription,
+    transcription,
+    runInitialAnalysis,
+    transcribeAudioChunk,
+  ]);
 
   const stopRecording = useCallback(() => {
     if (
@@ -279,19 +412,103 @@ export const useTeacherAssistant = () => {
     }
   }, []);
 
+  // --- NEW: Cloud Reprocessing Functions ---
+  const reprocessWithFirebase = async (type) => {
+    if (!fullTranscriptForReprocessing || !auth.currentUser) {
+      setStatusMessage("Error: No transcript or user not logged in.");
+      return;
+    }
+    setIsProcessing(true);
+
+    const userDocRef = doc(db, "users", auth.currentUser.uid);
+    const userDoc = await getDoc(userDocRef);
+
+    if (
+      userDoc.exists() &&
+      userDoc.data().firebaseAiCalls >= userDoc.data().maxFreeCalls
+    ) {
+      setStatusMessage(
+        "Error: You have exceeded your free Cloud AI calls limit."
+      );
+      setIsProcessing(false);
+      return;
+    }
+
+    let prompt = "";
+    let resultParser;
+
+    if (type === "analysis") {
+      setStatusMessage("Reprocessing with Cloud AI for full analysis...");
+      prompt = `Analyze the following transcript from a lesson. Respond with a JSON object containing three keys: "summary", "keyPoints", and "condensedLesson".\n\nTranscript:\n${fullTranscriptForReprocessing}`;
+      resultParser = (json) => {
+        setSummary(json.summary);
+        setKeyPoints(json.keyPoints);
+        setCondensedLesson(json.condensedLesson);
+      };
+    } else if (type === "followUp") {
+      setStatusMessage("Generating follow-up materials with Cloud AI...");
+      prompt = `Based on the following lesson transcript, generate a JSON object with three keys: "homework", "quiz", and "lessonCreatorPrompt".\n- For "homework", create 5 questions with a detailed answer key separated by '---ANSWERS---'.\n- For "quiz", create a 5-question multiple-choice quiz (4 options each) with an answer key separated by '---ANSWERS---'.\n- For "lessonCreatorPrompt", write a detailed prompt for a lesson-generating AI to create a story-driven lesson based on the transcript.\n\nTranscript:\n${fullTranscriptForReprocessing}`;
+      resultParser = (json) => {
+        setHomework(json.homework);
+        setQuiz(json.quiz);
+        setLessonCreatorPrompt(json.lessonCreatorPrompt);
+      };
+    }
+
+    try {
+      const result = await cloudTextModel.generateContent({
+        contents: [
+          {
+            parts: [
+              {
+                text: getContextualPrompt(
+                  prompt,
+                  fullTranscriptForReprocessing
+                ),
+              },
+            ],
+          },
+        ],
+        generationConfig: { responseMimeType: "application/json" },
+      });
+      const responseText = result.response.text();
+      const parsedJson = JSON.parse(responseText);
+      resultParser(parsedJson);
+
+      // Increment user's call count
+      await updateDoc(userDocRef, { firebaseAiCalls: increment(1) });
+
+      setStatusMessage("Cloud AI processing complete!");
+    } catch (error) {
+      console.error("Firebase AI re-processing failed:", error);
+      setStatusMessage(`Error during cloud processing: ${error.message}`);
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
   const handleFileUpload = useCallback(
     (file) => {
       if (file) processAudio(file);
     },
     [processAudio]
   );
+
+  // analyzeText can now handle both on-device and cloud
   const analyzeText = async (type) => {
-    if (!transcription || isProcessing) return;
+    if ((!transcription && !fullTranscriptForReprocessing) || isProcessing)
+      return;
+
+    // If it was partially processed, use the cloud for follow-up materials
+    if (isPartiallyProcessed) {
+      await reprocessWithFirebase("followUp");
+      return;
+    }
+
     setIsProcessing(true);
     try {
       let basePrompt = "";
       let resultSetter;
-
       switch (type) {
         case "homework":
           basePrompt =
@@ -313,7 +530,6 @@ export const useTeacherAssistant = () => {
           setIsProcessing(false);
           return;
       }
-
       setStatusMessage(`Creating ${type}...`);
       const contextualPrompt = getContextualPrompt(basePrompt, transcription);
       const result = await executeWrite(contextualPrompt, { length: "long" });
@@ -382,12 +598,15 @@ export const useTeacherAssistant = () => {
     quiz,
     lessonCreatorPrompt,
     ageRange,
-    setAgeRange, // Expose ageRange state
-    savedLessonId, // Expose saved status
+    setAgeRange,
+    savedLessonId,
     startRecording,
     stopRecording,
     handleFileUpload,
     analyzeText,
     saveLesson,
+    transcribeTestAudio, // Expose mic test function
+    isPartiallyProcessed, // Expose partial status
+    reprocessWithFirebase, // Expose reprocessing function
   };
 };

@@ -2,7 +2,7 @@
 import { useState, useMemo } from "react";
 import { useLanguageModel } from "./useLanguageModel";
 import { useMonitorDownload } from "./useMonitorDownload";
-import { imageModel, fileToGenerativePart } from "../lib/firebase";
+import { cloudImageModel as imageModel, fileToGenerativePart } from "../lib/firebase";
 
 const ageGroupToPromptMap = {
 "Grades 1-2 (Ages 6-7)": "a 6-7 year old child",

@@ -1,6 +1,8 @@
 // src/lib/firebase.js
-import { initializeApp } from 'firebase/app';
-import { getAI, getGenerativeModel, GoogleAIBackend } from 'firebase/ai';
+import { initializeApp } from "firebase/app";
+import { getAI, getGenerativeModel, GoogleAIBackend } from "firebase/ai";
+import { getFirestore } from "firebase/firestore";
+import { getAuth } from "firebase/auth";
 
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
@@ -12,43 +14,39 @@ const firebaseConfig = {
   measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID,
 };
 
-// Initialize FirebaseApp
-const firebaseApp = initializeApp(firebaseConfig);
+// Initialize and export Firebase services
+export const app = initializeApp(firebaseConfig);
+export const firestore = getFirestore(app);
+export const auth = getAuth(app);
 
 // Initialize the Google AI service
-const ai = getAI(firebaseApp, { backend: new GoogleAIBackend() });
+const ai = getAI(app, { backend: new GoogleAIBackend() });
 
-const onDeviceModel = getGenerativeModel(ai, {
-  model: 'gemini-2.5-flash',
-  mode: 'on_device',
-});
-const cloudModel = getGenerativeModel(ai, {
-  model: 'gemini-2.5-flash',
+export const cloudTextModel = getGenerativeModel(ai, {
+  model: "gemini-2.5-flash",
 });
 
-// Create a `GenerativeModel` instance for image generation
-export const imageModel = getGenerativeModel(ai, {
-  model: 'gemini-2.5-flash-image',
+export const cloudImageModel = getGenerativeModel(ai, {
+  model: "gemini-2.5-flash-image",
 });
 
-export const getModel = async () => {
-  if ('LanguageModel' in self && (await self.LanguageModel.availability()) === 'available') {
-    return onDeviceModel;
+// Helper to check for on-device support
+export const isNanoSupported = async () => {
+  try {
+    return (
+      "LanguageModel" in self &&
+      (await self.LanguageModel.availability()) === "available"
+    );
+  } catch (error) {
+    return false;
   }
-  return cloudModel;
 };
 
-export const getSource = async () =>
-  'LanguageModel' in self &&
-  (await self.LanguageModel.availability()) === 'available'
-    ? 'Built-in AI'
-    : 'Cloud AI';
-
-// Converts a File object to a Part object.
+// fileToGenerativePart remains unchanged
 export async function fileToGenerativePart(file) {
   const base64EncodedDataPromise = new Promise((resolve) => {
     const reader = new FileReader();
-    reader.onloadend = () => resolve(reader.result.split(',')[1]);
+    reader.onloadend = () => resolve(reader.result.split(",")[1]);
     reader.readAsDataURL(file);
   });
   return {
