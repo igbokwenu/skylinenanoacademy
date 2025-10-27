@@ -279,18 +279,17 @@ export const useTeacherAssistant = () => {
       switch (type) {
         case "homework":
           basePrompt =
-            "Based on this lesson transcript, create 5 homework questions with clear answers provided separately.";
+            "You are a teacher creating a homework assignment for your students based on a lesson you just taught. The content of the lesson is provided below. Create 5 homework questions that challenge students to think critically about the material. Provide a separate answer key below the questions.";
           resultSetter = setHomework;
           break;
         case "quiz":
           basePrompt =
-            "Based on this lesson transcript, create a 5-question multiple-choice quiz. For each question, provide 4 options and clearly indicate the correct answer.";
+            "You are a teacher creating a quiz for your students based on a lesson you just taught. The content of the lesson is provided below. Create a 5-question multiple-choice quiz. For each question, provide 4 options (A, B, C, D) and clearly indicate the correct answer.";
           resultSetter = setQuiz;
           break;
         case "lessonPrompt":
-          // --- FIX: Correctly include the transcription in the prompt ---
           basePrompt =
-            "Based on the following lesson transcript, create a detailed prompt for a lesson creator AI. The prompt should capture the core topic, key concepts, and suggest an engaging format (like a story or comic). The goal is to create a new, refined lesson based on this live one.";
+            "Analyze the lesson content provided below. Based on this analysis, create a detailed and compelling prompt for a lesson-generating AI. The new prompt should instruct the AI to create an engaging, story-driven lesson (like a comic book or storybook) that covers the core topics and concepts from the original lesson. Do not mention the word 'transcript'.";
           resultSetter = setLessonCreatorPrompt;
           break;
         default:
@@ -298,6 +297,7 @@ export const useTeacherAssistant = () => {
           setIsProcessing(false);
           return;
       }
+
       setStatusMessage(`Creating ${type}...`);
       const contextualPrompt = getContextualPrompt(basePrompt, transcription);
       const result = await executeWrite(contextualPrompt, { length: "long" });

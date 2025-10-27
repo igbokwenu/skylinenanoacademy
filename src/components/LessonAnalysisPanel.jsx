@@ -3,7 +3,6 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import "./LessonAnalysisPanel.css";
-import ShareModal from "./ShareModal";
 
 const sanitizeContent = (content) => {
   if (!content) return "";
@@ -12,8 +11,6 @@ const sanitizeContent = (content) => {
 
 const LessonAnalysisPanel = ({ hook }) => {
   const navigate = useNavigate();
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [modalConfig, setModalConfig] = useState({ onConfirm: () => {} });
   const {
     isProcessing,
     statusMessage,
@@ -54,31 +51,26 @@ const LessonAnalysisPanel = ({ hook }) => {
 
   // --- NEW: Function to create and launch email client ---
   const handleShareEmail = (materialType, content) => {
-    const fullEmailBody = `Hello class,\n\nPlease find your ${materialType.toLowerCase()} below:\n\n---\n\n${sanitizeContent(
-      content
-    )}\n\n---\n\nBest,\nYour Teacher`;
+    const subject = encodeURIComponent(`${lessonTitle}: ${materialType}`);
+    const body = encodeURIComponent(
+      `Hello class,\n\nPlease find your ${materialType.toLowerCase()} below:\n\n---\n\n${sanitizeContent(
+        content
+      )}\n\n---\n\nBest,\nYour Teacher`
+    );
 
-    navigator.clipboard
-      .writeText(fullEmailBody)
-      .then(() => {
-        const subject = encodeURIComponent(`${lessonTitle}: ${materialType}`);
-        const mailtoLink = `mailto:?subject=${subject}`;
+    const mailtoLink = `mailto:?subject=${subject}&body=${body}`;
 
-        // Configure the modal with the new robust action and the fallback link
-        setModalConfig({
-          mailtoLink: mailtoLink, // Pass the link for the fallback <a> tag
-          onConfirm: () => {
-            // Use window.open as the primary, more reliable programmatic method
-            window.open(mailtoLink, "_self");
-            setIsModalOpen(false);
-          },
-        });
-        setIsModalOpen(true);
-      })
-      .catch((err) => {
-        console.error("Failed to copy to clipboard", err);
-        alert("Could not copy content to clipboard. Please copy it manually.");
-      });
+    // A simple check for extremely long content that might still fail in some clients.
+    if (mailtoLink.length > 8000) {
+      alert(
+        "This content is very long and may not fit in an email link. We have copied it to your clipboard for you to paste manually."
+      );
+      navigator.clipboard.writeText(sanitizeContent(content));
+      return;
+    }
+
+    // Use window.open to avoid replacing the current tab.
+    window.open(mailtoLink, "_blank");
   };
   return (
     <div className="analysis-panel">
@@ -153,7 +145,7 @@ const LessonAnalysisPanel = ({ hook }) => {
                 <ResultCard
                   title="Lesson Creator Prompt"
                   onAction={handleUseInLessonCreator}
-                  actionText="Use in Lesson Creator & Save"
+                  actionText="Save & Use in Lesson Creator"
                   content={lessonCreatorPrompt}
                 />
               )}
@@ -172,15 +164,6 @@ const LessonAnalysisPanel = ({ hook }) => {
           </div>
         </>
       )}
-      <ShareModal
-        isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
-        onConfirm={modalConfig.onConfirm}
-        mailtoLink={modalConfig.mailtoLink} // <-- ADD THIS PROP
-        title="Content Copied Successfully!"
-      >
-        {/* The children are now hardcoded inside the ShareModal component */}
-      </ShareModal>
     </div>
   );
 };
