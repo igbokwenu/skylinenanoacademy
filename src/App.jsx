@@ -30,7 +30,7 @@ const AppContent = () => {
         setApiSupportStatus("On-device AI (Gemini Nano) is available.");
       } else {
         setApiSupportStatus(
-          "On-device AI not supported. App will use Cloud AI for authenticated users."
+          "On-device AI not supported. App will use Firebase AI (Cloud) for authenticated users."
         );
       }
     });
@@ -99,7 +99,7 @@ const AppContent = () => {
           {isInfoVisible && (
             <div className="info-box">
               {" "}
-              <h4>On-Device AI Hardware Requirements (Chrome 138+)</h4>
+              <h4>On-Device AI Hardware Requirements (Chrome Browser: 138+)</h4>
               <ul>
                 <li>
                   <strong>OS:</strong> Windows 10/11, macOS 13+, Linux, ChromeOS
@@ -117,7 +117,7 @@ const AppContent = () => {
                 </li>
                 <li>
                   <strong>Network:</strong> Unmetered connection for initial
-                  model download.
+                  Gemini Nano model download.
                 </li>
               </ul>
             </div>

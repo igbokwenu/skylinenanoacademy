@@ -29,10 +29,12 @@ export const useLanguageModel = ({ apiName, creationOptions = {} }) => {
         setStatus("On-device AI ready.");
         setCurrentSource("On-Device AI");
       } else if (user) {
-        setStatus("On-device not supported. Using Cloud AI.");
+        setStatus("On-device not supported. Using Firebase AI (Cloud).");
         setCurrentSource("Cloud AI");
       } else {
-        setStatus("On-device AI not supported. Login to use Cloud AI.");
+        setStatus(
+          "On-device AI not supported. Login to use Firebase AI (Cloud)."
+        );
         setCurrentSource("Unavailable");
       }
     });
@@ -109,7 +111,7 @@ export const useLanguageModel = ({ apiName, creationOptions = {} }) => {
     async (prompt, options = {}, monitor) => {
       if (!isSupported && !user) {
         setStatus(
-          "Error: On-device AI not available and not logged in for Cloud AI."
+          "Error: On-device Gemini Nano Model not supported on this device and not user is not logged in to enable access to Firebase AI (Cloud)."
         );
         return null;
       }
