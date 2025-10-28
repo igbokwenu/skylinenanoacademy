@@ -62,9 +62,7 @@ const AppContent = () => {
               >
                 <Info size={16} />
               </button>
-            </div>
-            <div className="auth-controls">
-              {user ? (
+               {user ? (
                 <>
                   <span className="user-email">{user.email}</span>
                   <button onClick={logout} className="auth-btn">
@@ -80,6 +78,23 @@ const AppContent = () => {
                 </button>
               )}
             </div>
+            {/* <div className="auth-controls">
+              {user ? (
+                <>
+                  <span className="user-email">{user.email}</span>
+                  <button onClick={logout} className="auth-btn">
+                    <LogOut size={16} /> Logout
+                  </button>
+                </>
+              ) : (
+                <button
+                  onClick={() => setIsAuthModalVisible(true)}
+                  className="auth-btn"
+                >
+                  <LogIn size={16} /> Login
+                </button>
+              )}
+            </div> */}
           </div>
           {isInfoVisible && (
             <div className="info-box">
