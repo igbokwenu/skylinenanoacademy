@@ -2,9 +2,14 @@
 import { useState, useRef, useCallback, useEffect } from "react";
 import { useLanguageModel } from "./useLanguageModel";
 import { db } from "../lib/db";
-import { cloudTextModel } from "../lib/firebase"; // Import cloud model for reprocessing
 import { doc, updateDoc, increment } from "firebase/firestore"; // For updating call count
 import { auth } from "../lib/firebase"; // For getting current user
+import {
+  isNanoSupported,
+  cloudTextModel,
+  fileToGenerativePart,
+} from "../lib/firebase";
+import { useAuth } from "./useAuth.jsx";
 
 // --- CONFIGURATION ---
 const CHUNK_SECONDS = 29;
@@ -62,6 +67,7 @@ const ON_DEVICE_TOKEN_LIMIT = 5800;
 const MAX_TRANSCRIPTION_DURATION_HOURS = 12;
 
 export const useTeacherAssistant = () => {
+  const { user, incrementCallCount } = useAuth();
   const [isRecording, setIsRecording] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [statusMessage, setStatusMessage] = useState("Ready to start.");
@@ -102,17 +108,20 @@ export const useTeacherAssistant = () => {
     return `${basePrompt}\n\nTailor the language, complexity, and examples to be appropriate for the following age group: ${ageRange}.\n\nTranscript:\n${transcript}`;
   };
 
-  const transcribeAudioChunk = useCallback(async (blob) => {
-    try {
-      if (!languageModelSessionRef.current) {
-        if (!("LanguageModel" in self))
-          throw new Error("LanguageModel API not supported.");
-        languageModelSessionRef.current = await self.LanguageModel.create({
-          expectedInputs: [{ type: "audio" }],
-        });
-      }
-      const arrayBuffer = await blob.arrayBuffer();
-      const result = await languageModelSessionRef.current.prompt([
+  const transcribeAudioChunk = useCallback(
+    async (blob) => {
+      const nanoSupported = await isNanoSupported();
+
+      if (nanoSupported) {
+        // --- ON-DEVICE LOGIC (Original) ---
+        try {
+          if (!languageModelSessionRef.current) {
+            languageModelSessionRef.current = await self.LanguageModel.create({
+              expectedInputs: [{ type: "audio" }],
+            });
+          }
+          const arrayBuffer = await blob.arrayBuffer();
+          const result = await languageModelSessionRef.current.prompt([
         {
           role: "user",
           content: [
@@ -120,21 +129,41 @@ export const useTeacherAssistant = () => {
             { type: "audio", value: arrayBuffer },
           ],
         },
-      ]);
-      return result;
-    } catch (error) {
-      console.error("Transcription chunk failed:", error);
-      // Don't show error for empty chunks during live transcription
-      if (!error.message.includes("empty")) {
-        setStatusMessage(`Error: ${error.message}`);
+          ]);
+          return result;
+        } catch (error) {
+          console.error("On-device transcription chunk failed:", error);
+          return "[TRANSCRIPTION ERROR]";
+        }
+      } else {
+        // --- CLOUD AI FALLBACK LOGIC (NEW) ---
+        if (!user) {
+          setStatusMessage(
+            "Login is required for transcription on this browser."
+          );
+          return "[LOGIN REQUIRED]";
+        }
+        try {
+          const audioPart = await fileToGenerativePart(blob);
+          const prompt =
+            "Transcribe this audio accurately. If there is no speech, return an empty string.";
+
+          const result = await cloudTextModel.generateContent([
+            prompt,
+            audioPart,
+          ]);
+          await incrementCallCount(); // Meter the API call
+
+          return result.response.text();
+        } catch (error) {
+          console.error("Cloud transcription chunk failed:", error);
+          setStatusMessage(`Cloud transcription error: ${error.message}`);
+          return "[TRANSCRIPTION ERROR]";
+        }
       }
-      if (languageModelSessionRef.current) {
-        languageModelSessionRef.current.destroy();
-        languageModelSessionRef.current = null;
-      }
-      return "[TRANSCRIPTION ERROR]";
-    }
-  }, []);
+    },
+    [user, incrementCallCount]
+  );
 
   // --- NEW: Microphone Test Transcription Function ---
   const transcribeTestAudio = useCallback(

@@ -109,7 +109,7 @@ export const useLanguageModel = ({ apiName, creationOptions = {} }) => {
 
   const executePrompt = useCallback(
     async (prompt, options = {}, monitor) => {
-      if (!isSupported && !user) {
+      if (!(await isNanoSupported()) && !user) {
         setStatus(
           "Error: On-device Gemini Nano Model not supported on this device and not user is not logged in to enable access to Firebase AI (Cloud)."
         );
@@ -120,15 +120,16 @@ export const useLanguageModel = ({ apiName, creationOptions = {} }) => {
 
       abortControllerRef.current = new AbortController();
       const { signal } = abortControllerRef.current;
-
       setIsLoading(true);
       setStatus("Generating response...");
       setOutput("");
 
       try {
         let finalResult = "";
-        if (isSupported) {
-          // --- ON-DEVICE LOGIC ---
+        const nanoSupported = await isNanoSupported();
+
+        if (nanoSupported) {
+          // --- ON-DEVICE LOGIC (Unchanged) ---
           setCurrentSource("On-Device AI");
           const session = sessionRef.current;
           const executionMethod =
@@ -155,7 +156,7 @@ export const useLanguageModel = ({ apiName, creationOptions = {} }) => {
             setOutput(finalResult);
           }
         } else {
-          // --- CLOUD AI LOGIC ---
+          // --- CLOUD AI LOGIC (REBUILT) ---
           setCurrentSource("Cloud AI");
           if (userInfo.firebaseAiCalls >= userInfo.maxFreeCalls) {
             throw new Error(
@@ -163,10 +164,56 @@ export const useLanguageModel = ({ apiName, creationOptions = {} }) => {
             );
           }
 
-          const result = await cloudTextModel.generateContentStream(prompt, {
-            signal,
-          });
-          await incrementCallCount(); // Increment count immediately
+          // FIX: Translate the prompt and options into a format the cloud SDK understands.
+          let cloudPrompt;
+          const generationConfig = {};
+
+          // Handle schema constraints
+          if (options.responseConstraint?.schema) {
+            generationConfig.responseMimeType = "application/json";
+            // Add a stronger instruction for the cloud model to follow the schema
+            const schemaText = JSON.stringify(
+              options.responseConstraint.schema
+            );
+            const schemaInstruction = `\nYou MUST respond in a valid JSON object matching this schema: ${schemaText}. Do not wrap the JSON in markdown backticks.`;
+
+            if (typeof prompt === "string") {
+              cloudPrompt = prompt + schemaInstruction;
+            } else if (Array.isArray(prompt)) {
+              // Find the text part and append to it
+              const userContent = prompt[0].content;
+              const textPart = userContent.find((p) => p.type === "text");
+              if (textPart) {
+                textPart.value += schemaInstruction;
+              }
+              cloudPrompt = userContent.map((p) => p.value);
+            }
+          } else {
+            // Handle simple string or multimodal prompts without schemas
+            if (typeof prompt === "string") {
+              cloudPrompt = prompt;
+            } else if (Array.isArray(prompt)) {
+              // The cloud SDK wants a flat array of parts, not the nested structure
+              cloudPrompt = prompt[0].content.map((p) => p.value);
+            }
+          }
+
+          const result = await cloudTextModel.generateContentStream(
+            {
+              contents: [
+                {
+                  role: "user",
+                  parts: cloudPrompt.map((p) =>
+                    typeof p === "string" ? { text: p } : p
+                  ),
+                },
+              ],
+              generationConfig,
+            },
+            { signal }
+          );
+
+          await incrementCallCount();
 
           for await (const chunk of result.stream) {
             const chunkText = chunk.text();
@@ -180,10 +227,9 @@ export const useLanguageModel = ({ apiName, creationOptions = {} }) => {
       } catch (error) {
         if (error.name === "AbortError") {
           setStatus("Prompt aborted by user.");
-          setOutput("Prompt was aborted.");
         } else {
           setStatus(`Error: ${error.message}`);
-          setOutput(`Error during execution: ${error.message}`);
+          console.error("Execution Error:", error);
         }
         return null;
       } finally {
@@ -191,9 +237,8 @@ export const useLanguageModel = ({ apiName, creationOptions = {} }) => {
         abortControllerRef.current = null;
       }
     },
-    [initializeSession, updateTokenUsage, isSupported, user, userInfo]
+    [initializeSession, updateTokenUsage, user, userInfo]
   );
-
   const abortCurrentPrompt = () => {
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();

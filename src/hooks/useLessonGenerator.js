@@ -5,6 +5,39 @@ import { useMonitorDownload } from "./useMonitorDownload";
 import { imageModel, fileToGenerativePart } from "../lib/firebase";
 import { useAuth } from "./useAuth.jsx";
 
+// New adapter function to handle different AI response formats
+const adaptLessonData = (data) => {
+  if (!data) return null;
+
+  // Standardize lesson scenes
+  let lesson = [];
+  if (data.lesson && Array.isArray(data.lesson)) {
+    lesson = data.lesson;
+  } else if (data.lesson_scenes && Array.isArray(data.lesson_scenes)) {
+    // Adapt from cloud format
+    lesson = data.lesson_scenes.map((scene) => ({
+      scene: scene.scene_number || scene.scene,
+      image_prompt: scene.image_prompt,
+      paragraph: scene.story_paragraph || scene.paragraph,
+    }));
+  }
+
+  // Standardize quiz
+  let quiz = [];
+  if (data.quiz && Array.isArray(data.quiz)) {
+    quiz = data.quiz;
+  } else if (data.quiz && typeof data.quiz === "object") {
+    // Adapt from cloud format (object of questions)
+    quiz = Object.values(data.quiz).map((q) => ({
+      question: q.question_text || q.question,
+      options: q.options,
+      answer: q.correct_answer || q.answer,
+    }));
+  }
+
+  return { ...data, lesson, quiz };
+};
+
 const ageGroupToPromptMap = {
   "Grades 1-2 (Ages 6-7)": "a 6-7 year old child",
   "Grades 3-5 (Ages 8-10)": "an 8-10 year old child",
@@ -169,19 +202,23 @@ export const useLessonGenerator = (initialSettings) => {
     customCharacterDescription,
     mainCharacter,
   ]);
+
   const handleCreateLesson = async () => {
     setLessonWithImages(null);
     setGeneratedLesson(null);
     setGenerationError(null);
     const rawAiResult = await executePrompt(
       userRequestPrompt,
-      { responseConstraint: lessonSchema },
+      { responseConstraint: { schema: lessonSchema } },
       getMonitor()
     );
     if (rawAiResult) {
-      const parsedLesson = cleanAndParseJson(rawAiResult);
-      if (parsedLesson) {
-        setGeneratedLesson(parsedLesson);
+      const parsedJson = cleanAndParseJson(rawAiResult);
+      // FIX: Adapt the parsed data to a consistent format
+      const adaptedLesson = adaptLessonData(parsedJson);
+
+      if (adaptedLesson && adaptedLesson.lesson.length > 0) {
+        setGeneratedLesson(adaptedLesson);
       } else {
         setGenerationError(
           "The AI failed to generate a valid lesson structure. Please try again."
@@ -199,7 +236,7 @@ export const useLessonGenerator = (initialSettings) => {
 
     if (!user) {
       setGenerationError(
-        "You must be logged in to generate images using Cloud AI."
+        "You must be logged in to generate images using Firebase AI (Cloud)."
       );
       return "auth_required"; // Special signal for the UI to handle
     }
