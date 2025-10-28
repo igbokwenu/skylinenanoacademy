@@ -2,16 +2,18 @@
 import { useState, useMemo } from "react";
 import { useLanguageModel } from "./useLanguageModel";
 import { useMonitorDownload } from "./useMonitorDownload";
-import { cloudImageModel as imageModel, fileToGenerativePart } from "../lib/firebase";
+import { imageModel, fileToGenerativePart } from "../lib/firebase";
+import { useAuth } from "./useAuth.jsx";
 
 const ageGroupToPromptMap = {
-"Grades 1-2 (Ages 6-7)": "a 6-7 year old child",
-"Grades 3-5 (Ages 8-10)": "an 8-10 year old child",
-"Grades 6-8 (Ages 11-13)": "an 11-13 year old adolescent",
-"Grades 9-12 (Ages 14-18)": "a 14-18 year old teenager",
-"Undergraduate (Ages 18-22)": "an 18-22 year old undergraduate student",
-"Graduate (Ages 23-26)": "a 23-26 year old graduate student",
-"Postgraduate/Doctoral (Ages 27+)": "a 27+ year old postgraduate or doctoral researcher",
+  "Grades 1-2 (Ages 6-7)": "a 6-7 year old child",
+  "Grades 3-5 (Ages 8-10)": "an 8-10 year old child",
+  "Grades 6-8 (Ages 11-13)": "an 11-13 year old adolescent",
+  "Grades 9-12 (Ages 14-18)": "a 14-18 year old teenager",
+  "Undergraduate (Ages 18-22)": "an 18-22 year old undergraduate student",
+  "Graduate (Ages 23-26)": "a 23-26 year old graduate student",
+  "Postgraduate/Doctoral (Ages 27+)":
+    "a 27+ year old postgraduate or doctoral researcher",
 };
 
 const cleanAndParseJson = (rawString) => {
@@ -53,6 +55,7 @@ export const useLessonGenerator = (initialSettings) => {
   });
 
   const { getMonitor } = useMonitorDownload();
+  const { user } = useAuth();
   const {
     isLoading,
     status,
@@ -192,7 +195,14 @@ export const useLessonGenerator = (initialSettings) => {
   };
 
   const handleGenerateImages = async () => {
-    if (!generatedLesson) return false; // Return false if no lesson
+    if (!generatedLesson) return false;
+
+    if (!user) {
+      setGenerationError(
+        "You must be logged in to generate images using Cloud AI."
+      );
+      return "auth_required"; // Special signal for the UI to handle
+    }
     setIsGeneratingImages(true);
     setGenerationError(null);
 
@@ -261,23 +271,33 @@ export const useLessonGenerator = (initialSettings) => {
           ],
         });
         const response = await result.response;
-        const candidates = response.candidates;
-        if (candidates && candidates.length > 0) {
-          const imagePart = candidates[0].content.parts.find(
-            (p) => p.inlineData
+        if (
+          !response ||
+          !response.candidates ||
+          response.candidates.length === 0
+        ) {
+          console.error(
+            "Invalid response from image generation API:",
+            response
           );
-          if (imagePart)
-            return { ...scene, imageData: imagePart.inlineData.data };
+          throw new Error("The AI failed to return a valid image candidate.");
         }
+        const candidates = response.candidates;
+
+        const imagePart = candidates[0].content.parts.find((p) => p.inlineData);
+        if (imagePart)
+          return { ...scene, imageData: imagePart.inlineData.data };
+
         return { ...scene, imageData: null };
       });
+
       const scenesWithImages = await Promise.all(imagePromises);
       setLessonWithImages({ ...generatedLesson, lesson: scenesWithImages });
       return true; // Return true on success
     } catch (error) {
       console.error("Batch image generation failed:", error);
       setGenerationError(
-        "An error occurred during image generation. Please try again."
+        `An error occurred during image generation: ${error.message}`
       );
       return false; // Return false on failure
     } finally {

@@ -6,6 +6,7 @@ import { useLessonGenerator } from "../hooks/useLessonGenerator";
 import LessonPreview from "../components/LessonPreview";
 import LessonSettingsPanel from "../components/LessonSettingsPanel";
 import GenerationActionsPanel from "../components/GenerationActionsPanel";
+import AuthModal from "../components/AuthModal";
 
 const initialCreatorSettings = {
   prompt: "Explain the process of photosynthesis in a magical forest.",
@@ -22,6 +23,7 @@ const initialCreatorSettings = {
 
 const LessonCreatorPage = () => {
   const [isPreviewVisible, setIsPreviewVisible] = useState(false);
+  const [isAuthModalVisible, setIsAuthModalVisible] = useState(false);
   const location = useLocation();
 
   // --- SHARED LESSON GENERATION LOGIC (From the Hook) ---
@@ -76,14 +78,25 @@ const LessonCreatorPage = () => {
   }, [location.state, setSettings]);
 
   const runImageGenerationAndShowPreview = async () => {
-    const success = await generateImagesInHook(); // Call the hook's function
-    if (success) {
-      setIsPreviewVisible(true); // Update local UI state on success
+    // Call the hook's function and capture its return value
+    const result = await generateImagesInHook();
+
+    // FIX: Check the result to decide what to do next
+    if (result === "auth_required") {
+      // If the hook signals that auth is needed, show the modal
+      setIsAuthModalVisible(true);
+    } else if (result === true) {
+      // If the hook signals success (true), show the preview
+      setIsPreviewVisible(true);
     }
+    // If the result is false, the hook has already set an error message, so we do nothing.
   };
 
   return (
     <div className="page-container">
+      {isAuthModalVisible && (
+        <AuthModal onClose={() => setIsAuthModalVisible(false)} />
+      )}
       {isPreviewVisible && (generatedLesson || lessonWithImages) && (
         <LessonPreview
           lesson={lessonWithImages || generatedLesson}

@@ -26,7 +26,8 @@ export const cloudTextModel = getGenerativeModel(ai, {
   model: "gemini-2.5-flash",
 });
 
-export const cloudImageModel = getGenerativeModel(ai, {
+// FIX: Renamed back to 'imageModel' for consistency and to fix import errors.
+export const imageModel = getGenerativeModel(ai, {
   model: "gemini-2.5-flash-image",
 });
 
