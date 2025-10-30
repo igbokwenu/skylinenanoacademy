@@ -16,7 +16,7 @@ You can explore the platform directly here:
 You don’t need to install anything to test the core features (lesson generation, rewriter, proofreader, summarizer, etc.), as these are all powered by the **on-device Gemini Nano APIs** available in the latest Chrome versions.
 
 > **Note:**  
-> Some advanced features such as image generation and hybrid Firebase AI fallback require login credentials (see the “Testing & Setup Guide for Judges” below).
+> Some advanced features such as image generation and hybrid Firebase AI fallback require login credentials (Hackathon Judges have been provided a login credential in the devpost project submission).
 
 ---
 
