@@ -25,3 +25,7 @@ $ gemini extensions uninstall https://github.com/gemini-cli-extensions/flutter
 ## License
 
 This project is licensed under the Apache License 2.0 — see the [LICENSE](LICENSE) file for details.
+
+## Notices
+
+See the [NOTICE](NOTICE) file for attributions to open-source components used directly or indirectly in this project.
