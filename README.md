@@ -1,26 +1,65 @@
-# React + Vite
+# Skyline Nano Academy
 
-chrome://on-device-internals/
+Skyline Nano Academy is a web-based AI education platform built with **React + Vite** and powered by **Gemini Nano** (Chrome Built-in AI APIs).  
+It brings personalized, on-device learning to every student and educator — from K–12 to university — without relying on expensive cloud AI.
+
+Public demo: [https://skylinenanoacademy.web.app/](https://skylinenanoacademy.web.app/)  
+Public repository: [https://github.com/igbokwenu/skylinenanoacademy.git](https://github.com/igbokwenu/skylinenanoacademy.git)
+
+---
+
+## 🚀 Quick Start (Public Testing)
+
+You can explore the platform directly here:  
+👉 **[Skyline Nano Academy Web App](https://skylinenanoacademy.web.app/)**
+
+You don’t need to install anything to test the core features (lesson generation, rewriter, proofreader, summarizer, etc.), as these are all powered by the **on-device Gemini Nano APIs** available in the latest Chrome versions.
+
+> **Note:**  
+> Some advanced features such as image generation and hybrid Firebase AI fallback require login credentials (see the “Testing & Setup Guide for Judges” below).
+
+---
+
+## 🧑‍💻 Local Development Setup
+
+If you want to clone and run the project locally:
+
+### 1. Clone the repository
+
+git clone https://github.com/igbokwenu/skylinenanoacademy.git
+cd skylinenanoacademy
+
+### 2. Install dependencies
+
+npm install
+
+### 3. (Optional) Configure Firebase AI
+
+If you’d like to enable image generation or make the app compatible with browsers that don’t yet support Gemini Nano, create a .env file in the root directory and add your Firebase configuration:
+
+VITE_FIREBASE_API_KEY="YOUR_FIREBASE_API_KEY"
+VITE_FIREBASE_AUTH_DOMAIN="YOUR_FIREBASE_AUTH_DOMAIN"
+VITE_FIREBASE_PROJECT_ID="YOUR_FIREBASE_PROJECT_ID"
+VITE_FIREBASE_STORAGE_BUCKET="YOUR_FIREBASE_STORAGE_BUCKET"
+VITE_FIREBASE_MESSAGING_SENDER_ID="YOUR_FIREBASE_MESSAGING_SENDER_ID"
+VITE_FIREBASE_APP_ID="YOUR_FIREBASE_APP_ID"
+VITE_FIREBASE_MEASUREMENT_ID="YOUR_FIREBASE_MEASUREMENT_ID"
+
+Then in your Firebase Console:
+
+Enable Firebase Authentication (email/password or any preferred method)
+
+Enable Vertex AI Gemini API via Firebase AI Logic to activate image generation and multimedia processing
+
+### 4. Start the development server
 
 npm run dev
 
-http://localhost:5173/
+### 📦 Project Details
 
-https://skylinenanoacademy.web.app/
-
-//Installing/Updating and debugging gemini CLI:
-npm install -g @google/gemini-cli
-
-//If something goes wrong like ENOTEMPTY(The path will be in the error so you might need to copy and paste)
-rm -rf /Users/increase/.nvm/versions/node/v22.12.0/lib/node_modules/@google/gemini-cli && npm cache clean --force && npm install -g @google/gemini-cli
-
-npm run build
-firebase deploy --only hosting
-//Deploying the app this command will run a script that builds the app and deploys it to Firebase Hosting:
-npm run deploy
-
-//Uninstall flutter gemini cli extension:
-$ gemini extensions uninstall https://github.com/gemini-cli-extensions/flutter
+Framework: React.js with Vite
+AI: Chrome Built-in AI APIs (Gemini Nano Writer, Rewriter, Proofreader, Summarizer)
+Dependencies: firebase (specifically the 11.7.1-eap-ai-hybridinference.58d92df33 version for the hybrid logic), react-router-dom, dexie (for local storage).
 
 ## License
 
