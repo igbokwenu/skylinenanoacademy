@@ -12,6 +12,7 @@ import {
 import { useAuth } from "./useAuth.jsx";
 
 // --- CONFIGURATION ---
+const MAX_CLOUD_AUDIO_MB = 100;
 const CHUNK_SECONDS = 29;
 const LIVE_TRANSCRIPTION_INTERVAL_MS = 5000; // Transcribe every 5 seconds
 const LIVE_TRANSCRIPTION_DELAY_MS = 60000; // Start live transcription after 1 minute (60 seconds)
