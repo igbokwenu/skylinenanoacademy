@@ -22,7 +22,7 @@ const AppContent = () => {
   const [isInfoVisible, setIsInfoVisible] = useState(false);
   const [isAuthModalVisible, setIsAuthModalVisible] = useState(false);
   const { downloadStatus } = useMonitorDownload();
-  const { user, logout } = useAuth();
+  const { user, logout, globalMessage } = useAuth();
 
   useEffect(() => {
     isNanoSupported().then((supported) => {
@@ -62,23 +62,6 @@ const AppContent = () => {
               >
                 <Info size={16} />
               </button>
-               {user ? (
-                <>
-                  <span className="user-email">{user.email}</span>
-                  <button onClick={logout} className="auth-btn">
-                    <LogOut size={16} /> Logout
-                  </button>
-                </>
-              ) : (
-                <button
-                  onClick={() => setIsAuthModalVisible(true)}
-                  className="auth-btn"
-                >
-                  <LogIn size={16} /> Login
-                </button>
-              )}
-            </div>
-            {/* <div className="auth-controls">
               {user ? (
                 <>
                   <span className="user-email">{user.email}</span>
@@ -94,8 +77,13 @@ const AppContent = () => {
                   <LogIn size={16} /> Login
                 </button>
               )}
-            </div> */}
+            </div>
           </div>
+          {globalMessage && (
+            <div className={`global-message ${globalMessage.type}`}>
+              {globalMessage.text}
+            </div>
+          )}
           {isInfoVisible && (
             <div className="info-box">
               {" "}

@@ -26,6 +26,12 @@ export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
   const [authError, setAuthError] = useState(null);
   const [userInfo, setUserInfo] = useState(null);
+  const [globalMessage, setGlobalMessage] = useState(null);
+
+  useEffect(() => {
+    // Clear message on user change
+    setGlobalMessage(null);
+  }, [user]);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
@@ -96,6 +102,17 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
+  useEffect(() => {
+    if (userInfo && userInfo.firebaseAiCalls >= userInfo.maxFreeCalls) {
+      setGlobalMessage({
+        text: `You have reached your free Firebase AI usage limit (${userInfo.maxFreeCalls} calls).`,
+        type: "error",
+      });
+    } else {
+      setGlobalMessage(null);
+    }
+  }, [userInfo]);
+
   const value = {
     user,
     userInfo,
@@ -105,6 +122,7 @@ export const AuthProvider = ({ children }) => {
     login,
     logout,
     incrementCallCount,
+    globalMessage,
   };
 
   // This is the return statement that requires the file to be .jsx
