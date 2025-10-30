@@ -4,6 +4,15 @@ import { useAuth } from "./useAuth";
 import { cloudTextModel, isNanoSupported } from "../lib/firebase";
 import { formatTokenUsage } from "../utils/tokenUtils";
 
+const isLikelyJson = (str) => {
+  try {
+    JSON.parse(str);
+    return true;
+  } catch (e) {
+    return false;
+  }
+};
+
 /**
  * A comprehensive hook for managing HYBRID on-device and cloud AI model sessions.
  * @param {object} options - Configuration for the hook.
@@ -109,9 +118,10 @@ export const useLanguageModel = ({ apiName, creationOptions = {} }) => {
 
   const executePrompt = useCallback(
     async (prompt, options = {}, monitor) => {
-      if (!(await isNanoSupported()) && !user) {
+      const nanoSupported = await isNanoSupported();
+      if (!nanoSupported && !user) {
         setStatus(
-          "Error: On-device Gemini Nano Model not supported on this device and not user is not logged in to enable access to Firebase AI (Cloud)."
+          "Error: On-device AI not available. Please login to use Firebase AI (Cloud)."
         );
         return null;
       }
@@ -126,37 +136,53 @@ export const useLanguageModel = ({ apiName, creationOptions = {} }) => {
 
       try {
         let finalResult = "";
-        const nanoSupported = await isNanoSupported();
 
         if (nanoSupported) {
-          // --- ON-DEVICE LOGIC (Unchanged) ---
+          // --- ON-DEVICE LOGIC (WITH RETRY MECHANISM) ---
           setCurrentSource("On-Device AI");
           const session = sessionRef.current;
-          const executionMethod =
-            session.promptStreaming ||
-            session.writeStreaming ||
-            session.rewriteStreaming ||
-            session.summarizeStreaming;
-          if (executionMethod) {
-            const stream = await executionMethod.call(session, prompt, {
-              ...options,
-              signal,
-            });
-            for await (const chunk of stream) {
-              finalResult += chunk;
-              setOutput(finalResult);
+
+          const run = async () => {
+            const executionMethod =
+              session.promptStreaming ||
+              session.writeStreaming ||
+              session.rewriteStreaming ||
+              session.summarizeStreaming;
+            let result = "";
+            if (!executionMethod) {
+              result = await (
+                session.prompt ||
+                session.write ||
+                session.rewrite ||
+                session.summarize
+              )(prompt, { ...options, signal });
+            } else {
+              const stream = await executionMethod.call(session, prompt, {
+                ...options,
+                signal,
+              });
+              for await (const chunk of stream) {
+                result += chunk;
+                setOutput(result);
+              }
             }
-          } else {
-            finalResult = await (
-              session.prompt ||
-              session.write ||
-              session.rewrite ||
-              session.summarize
-            )(prompt, { ...options, signal });
-            setOutput(finalResult);
+            return result;
+          };
+
+          finalResult = await run();
+
+          // FIX: If a schema was expected but we didn't get JSON, try one more time.
+          // This handles the inconsistency of the on-device API's first run.
+          if (
+            options.responseConstraint?.schema &&
+            !isLikelyJson(finalResult)
+          ) {
+            setStatus("Initial response was invalid, retrying...");
+            finalResult = await run(); // Retry the execution
           }
+          setOutput(finalResult);
         } else {
-          // --- CLOUD AI LOGIC (REBUILT) ---
+          // --- CLOUD AI LOGIC (COMPLETELY REBUILT) ---
           setCurrentSource("Cloud AI");
           if (userInfo.firebaseAiCalls >= userInfo.maxFreeCalls) {
             throw new Error(
@@ -164,50 +190,61 @@ export const useLanguageModel = ({ apiName, creationOptions = {} }) => {
             );
           }
 
-          // FIX: Translate the prompt and options into a format the cloud SDK understands.
-          let cloudPrompt;
+          // FIX: This block now robustly translates any prompt format into the
+          //      format required by the cloud GenerativeModel SDK.
+          let finalParts = [];
           const generationConfig = {};
 
-          // Handle schema constraints
+          if (typeof prompt === "string") {
+            // Case 1: The prompt is a simple string.
+            finalParts.push({ text: prompt });
+          } else if (Array.isArray(prompt)) {
+            // Case 2: The prompt is a complex array (for multimodal input).
+            // The on-device format is: [{ role: 'user', content: [ {type:'text', value:'...'}, {type:'image', value:File} ] }]
+            const content = prompt[0]?.content;
+            if (Array.isArray(content)) {
+              // This must be async to handle file conversions.
+              finalParts = await Promise.all(
+                content.map(async (part) => {
+                  if (part.type === "text") {
+                    return { text: part.value };
+                  }
+                  // THIS IS THE FIX for the 'required oneof field data' error.
+                  // It now correctly converts the File object to a Part object.
+                  if (part.type === "image" && part.value) {
+                    return await fileToGenerativePart(part.value);
+                  }
+                  // Fallback for any other type, like audio
+                  if (
+                    (part.type === "audio" || part.type === "video") &&
+                    part.value
+                  ) {
+                    return await fileToGenerativePart(new Blob([part.value]));
+                  }
+                  return {}; // Return empty object for invalid parts
+                })
+              );
+            }
+          }
+
+          // Handle schema constraints for JSON mode
           if (options.responseConstraint?.schema) {
             generationConfig.responseMimeType = "application/json";
-            // Add a stronger instruction for the cloud model to follow the schema
-            const schemaText = JSON.stringify(
+            const schemaInstruction = `\nYou MUST respond in a valid JSON object matching this schema: ${JSON.stringify(
               options.responseConstraint.schema
-            );
-            const schemaInstruction = `\nYou MUST respond in a valid JSON object matching this schema: ${schemaText}. Do not wrap the JSON in markdown backticks.`;
-
-            if (typeof prompt === "string") {
-              cloudPrompt = prompt + schemaInstruction;
-            } else if (Array.isArray(prompt)) {
-              // Find the text part and append to it
-              const userContent = prompt[0].content;
-              const textPart = userContent.find((p) => p.type === "text");
-              if (textPart) {
-                textPart.value += schemaInstruction;
-              }
-              cloudPrompt = userContent.map((p) => p.value);
-            }
-          } else {
-            // Handle simple string or multimodal prompts without schemas
-            if (typeof prompt === "string") {
-              cloudPrompt = prompt;
-            } else if (Array.isArray(prompt)) {
-              // The cloud SDK wants a flat array of parts, not the nested structure
-              cloudPrompt = prompt[0].content.map((p) => p.value);
+            )}. Do not wrap the JSON in markdown backticks.`;
+            // Add the instruction to the first text part found.
+            const textPart = finalParts.find((p) => "text" in p);
+            if (textPart) {
+              textPart.text += schemaInstruction;
+            } else {
+              finalParts.push({ text: schemaInstruction });
             }
           }
 
           const result = await cloudTextModel.generateContentStream(
             {
-              contents: [
-                {
-                  role: "user",
-                  parts: cloudPrompt.map((p) =>
-                    typeof p === "string" ? { text: p } : p
-                  ),
-                },
-              ],
+              contents: [{ role: "user", parts: finalParts }],
               generationConfig,
             },
             { signal }

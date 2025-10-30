@@ -226,7 +226,7 @@ export const useLessonGenerator = (initialSettings) => {
       }
     } else if (!isLoading) {
       setGenerationError(
-        "Lesson generation failed. The model may be offline or the request was aborted."
+        "Lesson generation failed. The model may be offline or the request was aborted. Try again and see if the issue resolves."
       );
     }
   };
