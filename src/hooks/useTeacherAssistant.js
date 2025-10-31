@@ -348,7 +348,7 @@ export const useTeacherAssistant = () => {
           return;
         }
 
-        setStatusMessage("Uploading and transcribing with Cloud AI...");
+        setStatusMessage("Uploading and transcribing with Firebase AI...");
         try {
           const audioPart = await fileToGenerativePart(blob);
           const prompt = "Transcribe this audio accurately and thoroughly.";
