@@ -24,6 +24,9 @@ const lessonParams = {
 
 const examplePrompts = [
   "Create a lesson about how red blood cells carry oxygen through the body.",
+  "Write a lesson that helps students understand metaphors and similes by turning them into living characters in a poem.",
+  "Create a lesson that explains quantum entanglement through a story about two best friends.",
+  "Create a chemistry lesson where students explore how atoms bond by imagining a school dance where elements form friendships based on shared electrons.",
   "Explain the process of photosynthesis in a magical forest.",
   "Create a detective story where students solve a mystery using the scientific method.",
   "Tell a story about the water cycle from the perspective of a single drop of water.",
