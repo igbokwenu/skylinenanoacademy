@@ -16,7 +16,7 @@ const HomePage = () => {
         <p className="hero-description">
           From live lecture transcriptions to personalized lesson plans,
           leverage the power of Gemini Nano to save time, engage students, and
-          bring your teaching to the next level—all securely on your device.
+          bring your teaching to the next level - all securely on your device.
         </p>
       </section>
 

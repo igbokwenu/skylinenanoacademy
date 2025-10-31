@@ -130,7 +130,7 @@ const AuthModal = ({ onClose }) => {
           <p>
             This project was developed for the Chrome Built-In Challenge so
             login capabilities are currently only available to the judges. If
-            you’d like to know when Image gen/Firebase AI usage is generally
+            you’d like to know when Image gen/Firebase (Cloud) AI usage is generally
             available please click below to join the waitlist.
           </p>
           <button
