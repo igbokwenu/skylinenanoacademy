@@ -80,6 +80,12 @@ Dependencies: firebase (specifically the 11.7.1-eap-ai-hybridinference.58d92df33
 | **Generate Lesson Blurb (on Publish)**            | `Summarizer`                                | `cloudTextModel`: The cloud model is prompted to generate a short, compelling summary.                                                                                      |
 | **Proofread Text and Suggest Corrections**        | `Proofreader`                               | _No Cloud Fallback_: This is a unique on-device-only feature. If the Proofreader API is unavailable, the “Edit Scene” button is hidden to prevent a broken user experience. |
 
+## Known Issues
+
+- **On-Device Audio Processing (Teacher Assistant Mode):**  
+  When using live recording or uploading audio or video for transcription: While up to 12 hours of on-device transcription is supported, hardware limitations may cause the process to slow down significantly over time. It starts fast for the first few minutes but gradually becomes slower due to structural constraints.  
+  **Recommendation:** For best results, use this feature for shorter lectures or defer to Firebase AI Logic for longer sessions and transcriptions.
+
 ## License
 
 This project is licensed under the Apache License 2.0 — see the [LICENSE](LICENSE) file for details.
