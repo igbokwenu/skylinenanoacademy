@@ -209,7 +209,7 @@ export const useLessonGenerator = (initialSettings) => {
     setGenerationError(null);
     const rawAiResult = await executePrompt(
       userRequestPrompt,
-      { responseConstraint: { schema: lessonSchema } },
+      { responseConstraint: lessonSchema }, // CORRECT - pass schema directly
       getMonitor()
     );
     if (rawAiResult) {
@@ -371,7 +371,7 @@ export const useLessonGenerator = (initialSettings) => {
     };
 
     const result = await executeImageAnalysis(prompt, {
-      responseConstraint: { schema: jsonSchema },
+      responseConstraint: jsonSchema, // CORRECT
     });
     if (result) {
       const parsedResult = cleanAndParseJson(result);
@@ -414,7 +414,7 @@ export const useLessonGenerator = (initialSettings) => {
     };
     const result = await executeImageAnalysis(
       [{ role: "user", content: [{ type: "text", value: prompt }] }],
-      { responseConstraint: { schema: jsonSchema } }
+      { responseConstraint: jsonSchema } // CORRECT
     );
     if (result) {
       const parsedResult = cleanAndParseJson(result);

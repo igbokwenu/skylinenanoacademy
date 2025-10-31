@@ -215,17 +215,20 @@ export const useLanguageModel = ({ apiName, creationOptions = {} }) => {
           }
 
           // Handle schema constraints for JSON mode
-          if (options.responseConstraint?.schema) {
+          if (options.responseConstraint) {
             generationConfig.responseMimeType = "application/json";
-            const schemaInstruction = `\nYou MUST respond in a valid JSON object matching this schema: ${JSON.stringify(
-              options.responseConstraint.schema
-            )}. Do not wrap the JSON in markdown backticks.`;
-            // Add the instruction to the first text part found.
-            const textPart = finalParts.find((p) => "text" in p);
-            if (textPart) {
-              textPart.text += schemaInstruction;
-            } else {
-              finalParts.push({ text: schemaInstruction });
+            generationConfig.responseSchema = options.responseConstraint; // Add schema to config
+
+            if (!options.omitResponseConstraintInput) {
+              const schemaInstruction = `\nYou MUST respond in a valid JSON object matching this schema: ${JSON.stringify(
+                options.responseConstraint
+              )}. Do not wrap the JSON in markdown backticks.`;
+              const textPart = finalParts.find((p) => "text" in p);
+              if (textPart) {
+                textPart.text += schemaInstruction;
+              } else {
+                finalParts.push({ text: schemaInstruction });
+              }
             }
           }
 

@@ -80,17 +80,6 @@ Dependencies: firebase (specifically the 11.7.1-eap-ai-hybridinference.58d92df33
 | **Generate Lesson Blurb (on Publish)**            | `Summarizer`                                | `cloudTextModel`: The cloud model is prompted to generate a short, compelling summary.                                                                                      |
 | **Proofread Text and Suggest Corrections**        | `Proofreader`                               | _No Cloud Fallback_: This is a unique on-device-only feature. If the Proofreader API is unavailable, the “Edit Scene” button is hidden to prevent a broken user experience. |
 
-### Known Issues
-
-Occasionally, the **Lesson Creator & Reteach Mode** (which uses `LanguageModel` with `responseConstraint`) may produce an incorrect or malformed response.
-Common symptoms include:
-
-- Unexpected numeric output (e.g., `-0.10000000000000003`, `-3.0`)
-- Empty or incomplete JSON structures
-
-This typically resolves after one or two retries, suggesting an initialization or “cold start” effect with `responseConstraint` mode.
-**Tip:** When this happens, click **“View Stream”** to inspect the output. If it doesn’t look right, abort and retry - the correct structured result usually follows on subsequent attempts.
-
 ## License
 
 This project is licensed under the Apache License 2.0 — see the [LICENSE](LICENSE) file for details.

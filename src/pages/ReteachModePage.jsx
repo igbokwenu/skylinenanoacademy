@@ -156,7 +156,7 @@ const ReteachModePage = () => {
 
     // 4. Execute the prompt
     const analysisJson = await executeAnalysis(finalPromptForAnalysis, {
-      responseConstraint: { schema: analysisSchema },
+      responseConstraint: analysisSchema, // CORRECT
     });
 
     if (analysisJson) {
