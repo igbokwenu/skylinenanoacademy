@@ -111,7 +111,7 @@ export const useLanguageModel = ({ apiName, creationOptions = {} }) => {
           setIsLoading(false);
         }
       }
-      return true; // Return true if already initialized or not needed (Cloud)
+      return true;
     },
     [isSupported, apiName, finalCreationOptions, updateTokenUsage]
   );
@@ -138,49 +138,32 @@ export const useLanguageModel = ({ apiName, creationOptions = {} }) => {
         let finalResult = "";
 
         if (nanoSupported) {
-          // --- ON-DEVICE LOGIC (WITH RETRY MECHANISM) ---
+          // --- ON-DEVICE LOGIC (Unchanged) ---
           setCurrentSource("On-Device AI");
           const session = sessionRef.current;
-
-          const run = async () => {
-            const executionMethod =
-              session.promptStreaming ||
-              session.writeStreaming ||
-              session.rewriteStreaming ||
-              session.summarizeStreaming;
-            let result = "";
-            if (!executionMethod) {
-              result = await (
-                session.prompt ||
-                session.write ||
-                session.rewrite ||
-                session.summarize
-              )(prompt, { ...options, signal });
-            } else {
-              const stream = await executionMethod.call(session, prompt, {
-                ...options,
-                signal,
-              });
-              for await (const chunk of stream) {
-                result += chunk;
-                setOutput(result);
-              }
+          const executionMethod =
+            session.promptStreaming ||
+            session.writeStreaming ||
+            session.rewriteStreaming ||
+            session.summarizeStreaming;
+          if (executionMethod) {
+            const stream = await executionMethod.call(session, prompt, {
+              ...options,
+              signal,
+            });
+            for await (const chunk of stream) {
+              finalResult += chunk;
+              setOutput(finalResult);
             }
-            return result;
-          };
-
-          finalResult = await run();
-
-          // FIX: If a schema was expected but we didn't get JSON, try one more time.
-          // This handles the inconsistency of the on-device API's first run.
-          if (
-            options.responseConstraint?.schema &&
-            !isLikelyJson(finalResult)
-          ) {
-            setStatus("Initial response was invalid, retrying...");
-            finalResult = await run(); // Retry the execution
+          } else {
+            finalResult = await (
+              session.prompt ||
+              session.write ||
+              session.rewrite ||
+              session.summarize
+            )(prompt, { ...options, signal });
+            setOutput(finalResult);
           }
-          setOutput(finalResult);
         } else {
           // --- CLOUD AI LOGIC (COMPLETELY REBUILT) ---
           setCurrentSource("Cloud AI");
@@ -276,6 +259,7 @@ export const useLanguageModel = ({ apiName, creationOptions = {} }) => {
     },
     [initializeSession, updateTokenUsage, user, userInfo]
   );
+
   const abortCurrentPrompt = () => {
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();

@@ -14,8 +14,7 @@ import { useAuth } from "./useAuth.jsx";
 // --- CONFIGURATION ---
 const MAX_CLOUD_AUDIO_MB = 100;
 const CHUNK_SECONDS = 29;
-const LIVE_TRANSCRIPTION_INTERVAL_MS = 5000; // Transcribe every 5 seconds
-const LIVE_TRANSCRIPTION_DELAY_MS = 60000; // Start live transcription after 1 minute (60 seconds)
+const MAX_TRANSCRIPTION_DURATION_HOURS = 12;
 
 // --- AUDIO UTILITIES (Unchanged) ---
 function writeString(view, offset, str) {
@@ -65,7 +64,6 @@ function encodeWavPCM16(audioBuffer) {
 // --- TOKEN ESTIMATION ---
 const estimateTokens = (text) => Math.ceil(text.length / 4);
 const ON_DEVICE_TOKEN_LIMIT = 5800;
-const MAX_TRANSCRIPTION_DURATION_HOURS = 12;
 
 export const useTeacherAssistant = () => {
   const { user, incrementCallCount } = useAuth();
@@ -123,13 +121,13 @@ export const useTeacherAssistant = () => {
           }
           const arrayBuffer = await blob.arrayBuffer();
           const result = await languageModelSessionRef.current.prompt([
-        {
-          role: "user",
-          content: [
-            { type: "text", value: "Transcribe this audio accurately." },
-            { type: "audio", value: arrayBuffer },
-          ],
-        },
+            {
+              role: "user",
+              content: [
+                { type: "text", value: "Transcribe this audio accurately." },
+                { type: "audio", value: arrayBuffer },
+              ],
+            },
           ]);
           return result;
         } catch (error) {
@@ -265,64 +263,106 @@ export const useTeacherAssistant = () => {
     async (blob) => {
       resetStateForNewJob();
       setIsProcessing(true);
-      setStatusMessage("Step 1/3: Decoding audio...");
-      try {
-        const arrayBuffer = await blob.arrayBuffer();
-        const ac = new (window.AudioContext || window.webkitAudioContext)();
-        const audioBuffer = await ac.decodeAudioData(arrayBuffer);
-        const { sampleRate, numberOfChannels, duration } = audioBuffer;
+      const nanoSupported = await isNanoSupported();
 
-        if (duration > MAX_TRANSCRIPTION_DURATION_HOURS * 3600) {
+      if (nanoSupported) {
+        // --- ON-DEVICE CHUNKING LOGIC (Your original, working code) ---
+        setStatusMessage("Step 1/3: Decoding audio...");
+        try {
+          const arrayBuffer = await blob.arrayBuffer();
+          const ac = new (window.AudioContext || window.webkitAudioContext)();
+          const audioBuffer = await ac.decodeAudioData(arrayBuffer);
+          const { sampleRate, numberOfChannels, duration } = audioBuffer;
+
+          if (duration > MAX_TRANSCRIPTION_DURATION_HOURS * 3600) {
+            setStatusMessage(
+              `Audio exceeds the maximum limit of ${MAX_TRANSCRIPTION_DURATION_HOURS} hours.`
+            );
+            setIsProcessing(false);
+            return;
+          }
+
+          const totalChunks = Math.max(1, Math.ceil(duration / CHUNK_SECONDS));
+          setStatusMessage(`Step 2/3: Slicing into ${totalChunks} chunk(s)...`);
+          const chunksToProcess = [];
+          for (let i = 0; i < totalChunks; i++) {
+            const start = i * CHUNK_SECONDS;
+            const end = Math.min((i + 1) * CHUNK_SECONDS, duration);
+            const chunkDuration = end - start;
+            const chunkStartFrame = Math.floor(start * sampleRate);
+            const framesInChunk = Math.floor(chunkDuration * sampleRate);
+            const chunkBuffer = ac.createBuffer(
+              numberOfChannels,
+              framesInChunk,
+              sampleRate
+            );
+            for (let ch = 0; ch < numberOfChannels; ch++) {
+              const sourceData = audioBuffer.getChannelData(ch);
+              const chunkData = sourceData.subarray(
+                chunkStartFrame,
+                chunkStartFrame + framesInChunk
+              );
+              chunkBuffer.copyToChannel(chunkData, ch, 0);
+            }
+            const wavBuffer = encodeWavPCM16(chunkBuffer);
+            chunksToProcess.push(new Blob([wavBuffer], { type: "audio/wav" }));
+          }
+          let fullTranscript = "";
+          for (const [index, chunk] of chunksToProcess.entries()) {
+            setStatusMessage(
+              `Step 3/3: Transcribing chunk ${index + 1} of ${totalChunks}...`
+            );
+            const transcriptPart = await transcribeAudioChunk(chunk);
+            fullTranscript += ` ${transcriptPart}`;
+            setTranscription(fullTranscript.trim());
+          }
+          await runInitialAnalysis(fullTranscript.trim());
+        } catch (error) {
+          console.error("Audio processing failed:", error);
+          setStatusMessage(`Error during processing: ${error.message}`);
+        } finally {
+          setIsProcessing(false);
+        }
+      } else {
+        // --- CLOUD AI SINGLE FILE LOGIC (NEW AND ROBUST) ---
+        if (!user) {
           setStatusMessage(
-            `Audio exceeds the maximum limit of ${MAX_TRANSCRIPTION_DURATION_HOURS} hours.`
+            "Please login to use transcription on this browser."
+          );
+          setIsProcessing(false);
+          return;
+        }
+        if (blob.size > MAX_CLOUD_AUDIO_MB * 1024 * 1024) {
+          setStatusMessage(
+            `File is too large. The limit for cloud transcription is ${MAX_CLOUD_AUDIO_MB}MB.`
           );
           setIsProcessing(false);
           return;
         }
 
-        const totalChunks = Math.max(1, Math.ceil(duration / CHUNK_SECONDS));
-        setStatusMessage(`Step 2/3: Slicing into ${totalChunks} chunk(s)...`);
-        const chunksToProcess = [];
-        for (let i = 0; i < totalChunks; i++) {
-          const start = i * CHUNK_SECONDS;
-          const end = Math.min((i + 1) * CHUNK_SECONDS, duration);
-          const chunkDuration = end - start;
-          const chunkStartFrame = Math.floor(start * sampleRate);
-          const framesInChunk = Math.floor(chunkDuration * sampleRate);
-          const chunkBuffer = ac.createBuffer(
-            numberOfChannels,
-            framesInChunk,
-            sampleRate
-          );
-          for (let ch = 0; ch < numberOfChannels; ch++) {
-            const sourceData = audioBuffer.getChannelData(ch);
-            const chunkData = sourceData.subarray(
-              chunkStartFrame,
-              chunkStartFrame + framesInChunk
-            );
-            chunkBuffer.copyToChannel(chunkData, ch, 0);
-          }
-          const wavBuffer = encodeWavPCM16(chunkBuffer);
-          chunksToProcess.push(new Blob([wavBuffer], { type: "audio/wav" }));
-        }
-        let fullTranscript = "";
-        for (const [index, chunk] of chunksToProcess.entries()) {
+        setStatusMessage("Uploading and transcribing with Cloud AI...");
+        try {
+          const audioPart = await fileToGenerativePart(blob);
+          const prompt = "Transcribe this audio accurately and thoroughly.";
+          const result = await cloudTextModel.generateContent([
+            prompt,
+            audioPart,
+          ]);
+          await incrementCallCount();
+          const fullTranscript = result.response.text();
+          setTranscription(fullTranscript);
+          await runInitialAnalysis(fullTranscript);
+        } catch (error) {
+          console.error("Cloud transcription failed:", error);
           setStatusMessage(
-            `Step 3/3: Transcribing chunk ${index + 1} of ${totalChunks}...`
+            `Error during cloud transcription: ${error.message}. Please check your network connection and try again.`
           );
-          const transcriptPart = await transcribeAudioChunk(chunk);
-          fullTranscript += ` ${transcriptPart}`;
-          setTranscription(fullTranscript.trim());
+        } finally {
+          setIsProcessing(false);
         }
-        await runInitialAnalysis(fullTranscript.trim());
-      } catch (error) {
-        console.error("Audio processing failed:", error);
-        setStatusMessage(`Error during processing: ${error.message}`);
-      } finally {
-        setIsProcessing(false);
       }
     },
-    [transcribeAudioChunk, runInitialAnalysis]
+    [user, transcribeAudioChunk, runInitialAnalysis, incrementCallCount]
   );
 
   const resetStateForNewJob = () => {
@@ -378,31 +418,23 @@ export const useTeacherAssistant = () => {
         if (e.data.size > 0) audioChunksRef.current.push(e.data);
       };
 
-      recorder.onstop = () => {
+      recorder.onstop = async () => {
         stream.getTracks().forEach((track) => track.stop());
         if (liveTranscriptionTimerRef.current)
           clearInterval(liveTranscriptionTimerRef.current);
 
-        const processFinalChunks = async () => {
-          if (audioChunksRef.current.length > 0) {
-            const finalBlob = new Blob(audioChunksRef.current, {
-              type: "audio/webm",
-            });
-            const finalTranscriptPart = await transcribeAudioChunk(finalBlob);
-            audioChunksRef.current = [];
-            const finalFullTranscript =
-              `${transcription} ${finalTranscriptPart}`.trim();
-            setTranscription(finalFullTranscript);
-            await runInitialAnalysis(finalFullTranscript);
-          } else {
-            await runInitialAnalysis(transcription);
-          }
+        // This is the key change: onstop, we create a single blob
+        // and pass it to our main hybrid processAudio function.
+        const finalBlob = new Blob(audioChunksRef.current, {
+          type: "audio/webm",
+        });
+        if (finalBlob.size > 0) {
+          await processAudio(finalBlob);
+        } else {
+          // If for some reason there's no audio, just stop processing.
+          setStatusMessage("No audio recorded.");
           setIsProcessing(false);
-        };
-
-        setIsProcessing(true);
-        setStatusMessage("Finalizing transcription...");
-        processFinalChunks();
+        }
       };
 
       recorder.start(LIVE_TRANSCRIPTION_INTERVAL_MS); // Slice audio at the same interval as transcription
@@ -424,20 +456,14 @@ export const useTeacherAssistant = () => {
       setStatusMessage("Microphone access denied. Please check permissions.");
       console.error(err);
     }
-  }, [
-    processAudio,
-    startLiveTranscription,
-    transcription,
-    runInitialAnalysis,
-    transcribeAudioChunk,
-  ]);
+  }, [processAudio, startLiveTranscription]);
 
   const stopRecording = useCallback(() => {
     if (
       mediaRecorderRef.current &&
       mediaRecorderRef.current.state === "recording"
     ) {
-      mediaRecorderRef.current.stop();
+      mediaRecorderRef.current.stop(); // This will trigger the onstop handler above
       setIsRecording(false);
     }
   }, []);
