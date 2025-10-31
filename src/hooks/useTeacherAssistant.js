@@ -91,7 +91,7 @@ export const useTeacherAssistant = () => {
   const mediaRecorderRef = useRef(null);
   const audioChunksRef = useRef([]);
   const languageModelSessionRef = useRef(null);
-  const liveTranscriptionTimerRef = useRef(null);
+  const recordingTimeoutRef = useRef(null);
 
   const { executePrompt: executeSummarize } = useLanguageModel({
     apiName: "Summarizer",
@@ -266,7 +266,7 @@ export const useTeacherAssistant = () => {
       const nanoSupported = await isNanoSupported();
 
       if (nanoSupported) {
-        // --- ON-DEVICE CHUNKING LOGIC (Your original, working code) ---
+        // --- ON-DEVICE CHUNKING LOGIC ---
         setStatusMessage("Step 1/3: Decoding audio...");
         try {
           const arrayBuffer = await blob.arrayBuffer();
@@ -275,6 +275,7 @@ export const useTeacherAssistant = () => {
           const { sampleRate, numberOfChannels, duration } = audioBuffer;
 
           if (duration > MAX_TRANSCRIPTION_DURATION_HOURS * 3600) {
+            // This check is now also handled by the recording timeout
             setStatusMessage(
               `Audio exceeds the maximum limit of ${MAX_TRANSCRIPTION_DURATION_HOURS} hours.`
             );
@@ -313,10 +314,17 @@ export const useTeacherAssistant = () => {
               `Step 3/3: Transcribing chunk ${index + 1} of ${totalChunks}...`
             );
             const transcriptPart = await transcribeAudioChunk(chunk);
+            if (transcriptPart === "[LOGIN REQUIRED]") {
+              // Early exit if login is required but user is not logged in
+              fullTranscript = transcriptPart;
+              break;
+            }
             fullTranscript += ` ${transcriptPart}`;
             setTranscription(fullTranscript.trim());
           }
-          await runInitialAnalysis(fullTranscript.trim());
+          if (fullTranscript !== "[LOGIN REQUIRED]") {
+            await runInitialAnalysis(fullTranscript.trim());
+          }
         } catch (error) {
           console.error("Audio processing failed:", error);
           setStatusMessage(`Error during processing: ${error.message}`);
@@ -324,7 +332,7 @@ export const useTeacherAssistant = () => {
           setIsProcessing(false);
         }
       } else {
-        // --- CLOUD AI SINGLE FILE LOGIC (NEW AND ROBUST) ---
+        // --- CLOUD AI SINGLE FILE LOGIC ---
         if (!user) {
           setStatusMessage(
             "Please login to use transcription on this browser."
@@ -364,7 +372,6 @@ export const useTeacherAssistant = () => {
     },
     [user, transcribeAudioChunk, runInitialAnalysis, incrementCallCount]
   );
-
   const resetStateForNewJob = () => {
     setTranscription("");
     setSummary("");
@@ -378,34 +385,6 @@ export const useTeacherAssistant = () => {
     setFullTranscriptForReprocessing("");
   };
 
-  const startLiveTranscription = useCallback(() => {
-    const transcribeCurrentChunks = async () => {
-      if (
-        mediaRecorderRef.current?.state !== "recording" ||
-        audioChunksRef.current.length === 0
-      )
-        return;
-
-      const liveBlob = new Blob(audioChunksRef.current, { type: "audio/webm" });
-      const transcriptPart = await transcribeAudioChunk(liveBlob);
-
-      // Clear chunks that have been transcribed
-      audioChunksRef.current = [];
-
-      if (transcriptPart !== "[TRANSCRIPTION ERROR]") {
-        setTranscription((prev) => `${prev} ${transcriptPart}`.trim());
-      }
-    };
-    // Clear any existing timer
-    if (liveTranscriptionTimerRef.current)
-      clearInterval(liveTranscriptionTimerRef.current);
-    // Set a new timer
-    liveTranscriptionTimerRef.current = setInterval(
-      transcribeCurrentChunks,
-      LIVE_TRANSCRIPTION_INTERVAL_MS
-    );
-  }, [transcribeAudioChunk]);
-
   const startRecording = useCallback(async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -418,56 +397,55 @@ export const useTeacherAssistant = () => {
         if (e.data.size > 0) audioChunksRef.current.push(e.data);
       };
 
-      recorder.onstop = async () => {
+      recorder.onstop = () => {
+        // This logic is now the same for manual stop or timeout
         stream.getTracks().forEach((track) => track.stop());
-        if (liveTranscriptionTimerRef.current)
-          clearInterval(liveTranscriptionTimerRef.current);
+        if (recordingTimeoutRef.current) {
+          clearTimeout(recordingTimeoutRef.current);
+        }
 
-        // This is the key change: onstop, we create a single blob
-        // and pass it to our main hybrid processAudio function.
         const finalBlob = new Blob(audioChunksRef.current, {
           type: "audio/webm",
         });
         if (finalBlob.size > 0) {
-          await processAudio(finalBlob);
+          processAudio(finalBlob);
         } else {
-          // If for some reason there's no audio, just stop processing.
-          setStatusMessage("No audio recorded.");
+          setStatusMessage("No audio was recorded.");
           setIsProcessing(false);
         }
       };
 
-      recorder.start(LIVE_TRANSCRIPTION_INTERVAL_MS); // Slice audio at the same interval as transcription
+      recorder.start();
       setIsRecording(true);
-      setStatusMessage(
-        `Recording... Live transcription will start in ${
-          LIVE_TRANSCRIPTION_DELAY_MS / 1000
-        } seconds.`
-      );
+      setStatusMessage('Recording... Click "End Lesson" to stop and process.');
 
-      // Delay the start of live transcription
-      setTimeout(() => {
-        if (mediaRecorderRef.current?.state === "recording") {
-          setStatusMessage("Recording... Live transcription is active.");
-          startLiveTranscription();
+      // Set a timeout to automatically stop the recording after 12 hours
+      recordingTimeoutRef.current = setTimeout(() => {
+        if (
+          mediaRecorderRef.current &&
+          mediaRecorderRef.current.state === "recording"
+        ) {
+          setStatusMessage(
+            "Maximum recording limit reached. Processing audio..."
+          );
+          stopRecording();
         }
-      }, LIVE_TRANSCRIPTION_DELAY_MS);
+      }, MAX_TRANSCRIPTION_DURATION_HOURS * 3600 * 1000);
     } catch (err) {
       setStatusMessage("Microphone access denied. Please check permissions.");
       console.error(err);
     }
-  }, [processAudio, startLiveTranscription]);
+  }, [processAudio]); // Corrected and simplified dependency array
 
   const stopRecording = useCallback(() => {
     if (
       mediaRecorderRef.current &&
       mediaRecorderRef.current.state === "recording"
     ) {
-      mediaRecorderRef.current.stop(); // This will trigger the onstop handler above
+      mediaRecorderRef.current.stop(); // This will trigger the onstop handler
       setIsRecording(false);
     }
   }, []);
-
   // --- NEW: Cloud Reprocessing Functions ---
   const reprocessWithFirebase = async (type) => {
     if (!fullTranscriptForReprocessing || !auth.currentUser) {

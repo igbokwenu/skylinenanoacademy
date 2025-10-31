@@ -5,6 +5,7 @@ import placeholderImage from "../assets/skyline_nano_academy.png";
 import { useLanguageModel } from "../hooks/useLanguageModel";
 import { useMonitorDownload } from "../hooks/useMonitorDownload";
 import { db } from "../lib/db";
+import { isNanoSupported } from "../lib/firebase";
 
 // Helper function to convert base64 to Blob
 const base64ToBlob = (base64, contentType = "image/png") => {
@@ -31,6 +32,7 @@ const LessonPreview = ({
   const [editableLesson, setEditableLesson] = useState(
     JSON.parse(JSON.stringify(lesson))
   );
+  const [canUseEditingTools, setCanUseEditingTools] = useState(false);
   const [editingSceneId, setEditingSceneId] = useState(null);
   const [rewritePrompt, setRewritePrompt] = useState("");
   const [proofreadResult, setProofreadResult] = useState(null);
@@ -62,6 +64,13 @@ const LessonPreview = ({
   const currentScene = editableLesson.lesson[currentSceneIndex];
   const totalScenes = editableLesson.lesson.length;
   const totalQuestions = editableLesson.quiz.length;
+
+  // FIX 3: Add a useEffect to check for support when the component mounts
+  useEffect(() => {
+    isNanoSupported().then((supported) => {
+      setCanUseEditingTools(supported);
+    });
+  }, []); // Empty dependency array means this runs only once on mount
 
   // --- HANDLERS ---
 
@@ -523,9 +532,18 @@ const LessonPreview = ({
                   <div className="paragraph-container">
                     <p>{currentScene.paragraph}</p>
                   </div>
-                  <button onClick={() => handleEdit(currentScene.scene)}>
-                    Edit Scene
-                  </button>
+                  {canUseEditingTools ? (
+                    <button onClick={() => handleEdit(currentScene.scene)}>
+                      Edit Scene
+                    </button>
+                  ) : (
+                    <p className="edit-disabled-note">
+                      <em>
+                        Editing tools (Rewrite, Proofread) require a browser
+                        with on-device AI support (Google Chrome 138+).
+                      </em>
+                    </p>
+                  )}
                 </>
               )}
             </div>

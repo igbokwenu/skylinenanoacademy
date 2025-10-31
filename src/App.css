@@ -137,6 +137,16 @@ button:hover {
   border-radius: 3px;
 }
 
+.edit-disabled-note {
+  font-size: 0.85rem;
+  color: #666;
+  background-color: #f0f2f5;
+  padding: 0.5rem 1rem;
+  border-radius: 4px;
+  margin-top: 1rem;
+  text-align: center;
+}
+
 .button-group {
   display: flex;
   flex-direction: column; /* This was added */

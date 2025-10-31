@@ -1,7 +1,11 @@
 // src/hooks/useLanguageModel.js
 import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { useAuth } from "./useAuth";
-import { cloudTextModel, isNanoSupported } from "../lib/firebase";
+import {
+  cloudTextModel,
+  isNanoSupported,
+  fileToGenerativePart,
+} from "../lib/firebase";
 import { formatTokenUsage } from "../utils/tokenUtils";
 
 const isLikelyJson = (str) => {
