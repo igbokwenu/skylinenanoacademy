@@ -42,7 +42,12 @@ const TeacherAssistantPage = () => {
         <h3>Teacher Assistant</h3>
         <p>
           Record your lesson, get instant transcriptions, summaries, and
-          generate learning materials on the fly.
+          generate learning materials on the fly. While up to 12 hours of
+          on-device transcription is supported, hardware limitations will
+          degrade the speed of transcription over time and will make the process
+          significantly slower. For best results, use this feature for
+          reasonably timed short lectures or defer to Firebase AI for longer
+          sessions or transcriptions.
         </p>
         <button
           className="view-saved-btn"
