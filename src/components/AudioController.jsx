@@ -135,7 +135,7 @@ const AudioController = ({
               isRecording || isProcessing ? "disabled" : ""
             }`}
           >
-            Or Upload Audio File
+            Or Upload Audio/Video File
           </label>
           <button
             onClick={onMicCheck}
