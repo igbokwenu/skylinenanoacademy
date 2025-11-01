@@ -355,7 +355,7 @@ export const useLessonGenerator = (initialSettings) => {
           {
             type: "text",
             value:
-              'Analyze the person in this image. Strictly describe only their facial and head features (like eye shape and color, nose, mouth, jawline, hair style and color, freckles, glasses, etc.), gender, and ethnicity. **Crucially, do NOT describe their clothing, non-facial accessories, or the background.** For the ethnicity, choose one: "American Indian or Alaska Native", "Asian", "Black or African American", "White", "Hispanic or Latino", "Middle Eastern or North African (MENA)", "Native Hawaiian or Pacific Islander". Respond in JSON format with keys: "gender", "ethnicity", "facialFeatures".',
+              'Analyze the person in this image. Strictly describe only their facial and head features (like eye shape and color, nose, mouth, jawline, hair style and color, freckles, glasses, etc.), gender (select from: Male, Female, Other), and ethnicity. **Crucially, do NOT describe their clothing, non-facial accessories, or the background.** For the ethnicity, choose one: "American Indian or Alaska Native", "Asian", "Black or African American", "White", "Hispanic or Latino", "Middle Eastern or North African (MENA)", "Native Hawaiian or Pacific Islander". Respond in JSON format with keys: "gender", "ethnicity", "facialFeatures".',
           },
         ],
       },
