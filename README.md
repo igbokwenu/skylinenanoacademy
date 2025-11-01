@@ -8,6 +8,12 @@ Public repository: [https://github.com/igbokwenu/skylinenanoacademy.git](https:/
 
 ---
 
+## 🎥 Demo Video
+
+Curious to see Skyline Nano Academy in action?  
+Watch the full live demo on YouTube:  
+👉 [https://youtu.be/xwqZhVIrJ0c](https://youtu.be/xwqZhVIrJ0c)
+
 ## 🚀 Quick Start (Public Testing)
 
 You can explore the platform directly here:  
@@ -32,6 +38,12 @@ cd skylinenanoacademy
 ### 2. Install dependencies
 
 npm install
+
+🔗 [Official Documentation: Chrome Built-in AI APIs](https://developer.chrome.com/docs/ai/built-in-apis)
+
+Make sure you’ve enabled all the on-device APIs used in this project — including **Prompt**, **Writer**, **Rewriter**, **Proofreader**, and **Summarizer** — except **Translation** and **Language Detection**, which are not required in this project.
+
+> ⚙️ **Tip:** The built-in APIs can be toggled via Chrome flags or experimental settings depending on your Chrome version. Check the documentation above for detailed up-to-date steps and compatibility notes.
 
 ### 3. (Optional) Configure Firebase AI
 
